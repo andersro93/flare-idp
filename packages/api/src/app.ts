@@ -1,8 +1,15 @@
+import { env } from "cloudflare:workers";
 import { Hono } from "hono";
+import { createAuth } from "./auth";
 
 export const app = new Hono<{ Bindings: Env }>();
 
 app.get("/api/health/live", (c) => c.json({ status: "ok" }));
+
+// Module-level singleton: one init per isolate. Spike S2 measures its cost.
+export const auth = createAuth(env as Env);
+
+app.on(["GET", "POST"], "/api/auth/*", (c) => auth.handler(c.req.raw));
 
 // Unknown API paths must never fall through to the SPA/asset handler.
 app.all("/api/*", (c) =>
