@@ -1,0 +1,33 @@
+# Cuts releases from Conventional Commits on main:
+#  - keeps a "chore(main): release X.Y.Z" pull request up to date with the
+#    pending version bump and CHANGELOG.md;
+#  - when that PR is merged, creates the git tag vX.Y.Z and a GitHub Release.
+# Configuration: release-please-config.json + .release-please-manifest.json.
+#
+# Note: with the default GITHUB_TOKEN the release PR does not trigger the CI
+# workflow (GitHub prevents recursive workflow runs). Add a fine-grained PAT
+# with contents+pull-requests write as the RELEASE_PLEASE_TOKEN secret if you
+# want CI to run on release PRs.
+name: Release Please
+
+on:
+  push:
+    branches: [main]
+
+permissions:
+  contents: write
+  pull-requests: write
+
+concurrency:
+  group: release-please
+  cancel-in-progress: false
+
+jobs:
+  release-please:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: googleapis/release-please-action@v5
+        with:
+          token: ${{ secrets.RELEASE_PLEASE_TOKEN || secrets.GITHUB_TOKEN }}
+          config-file: release-please-config.json
+          manifest-file: .release-please-manifest.json

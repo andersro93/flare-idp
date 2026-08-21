@@ -1,0 +1,49 @@
+# Dependabot keeps dependencies current in small, grouped PRs.
+# Commit messages follow Conventional Commits ("chore(deps): …") so
+# release-please and the commit lint accept them.
+version: 2
+updates:
+  - package-ecosystem: bun
+    directory: /
+    schedule:
+      interval: weekly
+      day: monday
+      time: "06:00"
+      timezone: Europe/Oslo
+    open-pull-requests-limit: 10
+    commit-message:
+      prefix: chore
+      include: scope
+    labels: [dependencies]
+    cooldown:
+      default-days: 3
+    groups:
+      # Better Auth ships core + plugins in lockstep; always bump them together.
+      better-auth:
+        patterns: ["better-auth", "@better-auth/*"]
+      cloudflare:
+        patterns: ["wrangler", "@cloudflare/*", "miniflare"]
+      tanstack:
+        patterns: ["@tanstack/*"]
+      react:
+        patterns: ["react", "react-dom", "@types/react", "@types/react-dom"]
+      vite-vitest:
+        patterns: ["vite", "vitest", "@vitejs/*", "@vitest/*", "jsdom", "@testing-library/*"]
+      hono:
+        patterns: ["hono", "@hono/*", "@scalar/*"]
+      tooling:
+        patterns: ["@biomejs/*", "typescript", "@types/node", "lefthook", "@commitlint/*"]
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: weekly
+      day: monday
+      time: "06:00"
+      timezone: Europe/Oslo
+    commit-message:
+      prefix: ci
+      include: scope
+    labels: [dependencies, ci]
+    groups:
+      actions:
+        patterns: ["*"]
