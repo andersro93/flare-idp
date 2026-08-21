@@ -9,6 +9,7 @@ Cloudflare-native Identity Provider (OIDC) built on Better-Auth, Hono and React.
 
 ```sh
 bun install
+bun run --cwd apps/idp types   # generate Cloudflare Env types for your editor (also run by typecheck)
 cp apps/idp/.dev.vars.example apps/idp/.dev.vars   # edit secrets
 bun run dev          # Vite + workerd on http://localhost:5173
 bun run ci           # lint, typecheck, tests, build
