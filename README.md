@@ -4,6 +4,7 @@ Cloudflare-native Identity Provider (OIDC) built on Better-Auth, Hono and React.
 
 - Design: `docs/superpowers/specs/2026-08-21-flare-idp-design.md`
 - Plans: `docs/superpowers/plans/`
+- Decisions / verified facts: docs/decisions.md
 
 ## Development
 
