@@ -8,8 +8,8 @@ import {
 /**
  * S3: the passkey plugin (SimpleWebAuthn) loads and runs on workerd. A real
  * attestation needs an authenticator, so we prove: options generate (challenge
- * is persisted), a bogus attestation is rejected with a 4xx/5xx APIError (not a
- * crash), and authentication options generate.
+ * is persisted), a bogus attestation is rejected with a clean APIError (not a
+ * crash) at its exact real status/code, and authentication options generate.
  *
  * Real behaviour observed on workerd (see docs/decisions.md / task-8-report.md):
  * - `generatePasskeyRegistrationOptions` response: `{ challenge, rp: { name, id },
@@ -44,6 +44,12 @@ describe("S3 passkey plugin on workerd", () => {
       true,
     );
 
+    // Observed real behaviour on workerd: malformed client-supplied
+    // attestation surfaces as a 500 (INTERNAL_SERVER_ERROR), not a 4xx —
+    // SimpleWebAuthn's parse/verify failure is caught by the passkey
+    // plugin's catch-all and re-thrown as this exact APIError, even though
+    // the failure is entirely caused by client input. The Phase 5 facade
+    // should map this to a 400 for the SPA.
     await expect(
       auth.api.verifyPasskeyRegistration({
         body: {
@@ -58,10 +64,9 @@ describe("S3 passkey plugin on workerd", () => {
         headers: jar.headers(),
       }),
     ).rejects.toMatchObject({
-      status: expect.stringMatching(
-        /BAD_REQUEST|UNAUTHORIZED|INTERNAL_SERVER_ERROR/,
-      ),
-      message: expect.stringMatching(/verify/i),
+      status: "INTERNAL_SERVER_ERROR",
+      body: { code: "FAILED_TO_VERIFY_REGISTRATION" },
+      message: "Failed to verify registration",
     });
 
     expect(await auth.api.listPasskeys({ headers: jar.headers() })).toEqual([]);
