@@ -1,0 +1,3 @@
+# Copy to .dev.vars (git-ignored). Generate with: openssl rand -hex 32
+AUTH_SECRET=replace-with-64-hex-chars
+SETUP_SECRET=replace-with-a-long-passphrase

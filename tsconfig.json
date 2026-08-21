@@ -1,0 +1,20 @@
+{
+  "extends": "./tsconfig.base.json",
+  "compilerOptions": {
+    "types": ["node", "vitest/globals", "@cloudflare/vitest-plugin/types"],
+    "paths": {
+      "@flare-idp/api": ["./packages/api/src/index.ts"],
+      "@flare-idp/db": ["./packages/db/src/index.ts"],
+      "@flare-idp/shared": ["./packages/shared/src/index.ts"],
+      "@flare-idp/email": ["./packages/email/src/index.ts"]
+    }
+  },
+  "include": [
+    "apps/idp/worker-configuration.d.ts",
+    "apps/idp/src/**/*",
+    "apps/idp/test/**/*",
+    "apps/idp/*.ts",
+    "packages/*/src/**/*"
+  ],
+  "exclude": ["**/node_modules", "**/dist", "**/.wrangler"]
+}

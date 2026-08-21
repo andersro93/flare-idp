@@ -1,0 +1,28 @@
+{
+  "name": "@flare-idp/app",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "vite dev",
+    "build": "vite build",
+    "preview": "vite preview",
+    "deploy": "vite build && wrangler deploy",
+    "types": "wrangler types",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "db:apply:local": "wrangler d1 migrations apply flare-idp --local"
+  },
+  "dependencies": {
+    "@flare-idp/api": "workspace:*",
+    "@flare-idp/db": "workspace:*",
+    "@flare-idp/email": "workspace:*",
+    "@flare-idp/shared": "workspace:*"
+  },
+  "devDependencies": {
+    "@cloudflare/vitest-plugin": "1.0.0",
+    "@types/node": "26.2.0",
+    "vitest": "4.1.11",
+    "wrangler": "4.125.0"
+  }
+}

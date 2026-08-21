@@ -1,1 +1,9 @@
 .superpowers/
+node_modules/
+dist/
+.wrangler/
+coverage/
+.dev.vars
+.env
+.DS_Store
+*.log

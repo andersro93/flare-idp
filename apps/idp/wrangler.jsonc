@@ -1,0 +1,51 @@
+{
+  "$schema": "../../node_modules/wrangler/config-schema.json",
+  "name": "flare-idp",
+  "main": "src/worker.ts",
+  "compatibility_date": "2026-08-17",
+  "compatibility_flags": ["nodejs_compat"],
+  // Wrangler treats this file as the source of truth and would delete
+  // dashboard-set vars on deploy; keep_vars preserves them.
+  "keep_vars": true,
+  "assets": {
+    "binding": "ASSETS",
+    "not_found_handling": "single-page-application",
+    // Every request goes through the Worker so one secureHeaders block
+    // governs the SPA and the API.
+    "run_worker_first": true
+  },
+  "d1_databases": [
+    {
+      "binding": "DB",
+      "database_name": "flare-idp",
+      "database_id": "local-dev-unused",
+      "migrations_dir": "../../packages/db/migrations"
+    }
+  ],
+  "kv_namespaces": [{ "binding": "KV", "id": "local-dev-unused" }],
+  "queues": {
+    "producers": [{ "binding": "EMAIL_QUEUE", "queue": "flare-idp-email" }],
+    "consumers": [
+      {
+        "queue": "flare-idp-email",
+        "max_batch_size": 10,
+        "max_retries": 3,
+        "dead_letter_queue": "flare-idp-email-dlq"
+      }
+    ]
+  },
+  "send_email": [{ "name": "EMAIL" }],
+  "triggers": { "crons": ["0 3 * * *"] },
+  "vars": {
+    "APP_NAME": "flare-idp",
+    "APP_URL": "http://localhost:5173",
+    "ENVIRONMENT": "development"
+  },
+  "observability": {
+    "logs": {
+      "enabled": true,
+      // Invocation logs record full URLs; auth links carry tokens.
+      "invocation_logs": false
+    }
+  }
+}

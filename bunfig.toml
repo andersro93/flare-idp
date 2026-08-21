@@ -1,0 +1,7 @@
+[install]
+exact = true
+# Hoisted (not isolated/pnpm-style) node_modules: the root tsconfig.json runs
+# a single `tsc` over every workspace and resolves "types" (vitest/globals,
+# @cloudflare/vitest-plugin/types, node) by walking up from the repo root, so
+# those packages must be hoisted into the root node_modules.
+linker = "hoisted"

@@ -1,0 +1,28 @@
+{
+  "name": "flare-idp",
+  "private": true,
+  "type": "module",
+  "workspaces": [
+    "apps/*",
+    "packages/*"
+  ],
+  "engines": {
+    "node": ">=22.12.0",
+    "bun": ">=1.4.0"
+  },
+  "packageManager": "bun@1.4.0",
+  "scripts": {
+    "check": "biome check .",
+    "format": "biome format --write .",
+    "typecheck": "bun run --cwd apps/idp types && tsc --noEmit -p tsconfig.json",
+    "test": "bun run --cwd apps/idp test",
+    "test:watch": "bun run --cwd apps/idp test:watch",
+    "build": "bun run --cwd apps/idp build",
+    "dev": "bun run --cwd apps/idp dev",
+    "ci": "bun run check && bun run typecheck && bun run test && bun run build"
+  },
+  "devDependencies": {
+    "@biomejs/biome": "2.5.9",
+    "typescript": "7.0.2"
+  }
+}
