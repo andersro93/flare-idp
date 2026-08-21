@@ -13,6 +13,14 @@ export default defineConfig({
   test: {
     projects: [
       {
+        test: {
+          name: "unit",
+          environment: "jsdom",
+          include: ["test/unit/**/*.test.{ts,tsx}"],
+          setupFiles: ["./test/unit/setup.ts"],
+        },
+      },
+      {
         plugins: [
           cloudflareTest(async () => {
             const migrations = await readD1Migrations(
