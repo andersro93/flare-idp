@@ -3,9 +3,8 @@
 Facts verified by the Phase 0 spikes (date: 2026-08-21, better-auth 1.7.1, wrangler 4.125.0,
 `@cloudflare/vite-plugin` 1.53.1, `@cloudflare/vitest-plugin` 1.0.0, jose 6.2.9, otpauth 9.5.1).
 
-Source of record: the Task 4–10 implementer reports in
-`.superpowers/sdd/2026-08-21-phase-0-scaffold-and-spikes/`. Every fact below is a measured result
-from those spikes, not a projection.
+Source of record: `apps/idp/test/spikes/*` (and `apps/idp/scripts/check-startup.sh` for S2). Every
+fact below is a measured result from those spikes, not a projection.
 
 ## S1 — workspace paths
 
@@ -172,8 +171,11 @@ from those spikes, not a projection.
   table-listing query must exclude `sqlite_%` and `_cf_%` prefixes.
 - **Per-test isolation, corrected finding**: `@cloudflare/vitest-plugin`'s "isolated per-test
   storage" isolates storage **per test file**, not per `it()` block — there is no per-`it()`
-  isolation for any binding (D1 or KV). A row written in one `it()` is visible to a later `it()`
-  in the same file. The spike's helper (`migrateSpikeDb` → `dropExistingAuthTables`) is now
+  isolation for any binding (D1 or KV). `@cloudflare/vitest-plugin` 1.0.0's own README describes
+  this as "isolated per-test storage," but in practice that means per test *file*: there is no
+  `isolatedStorage` option and no per-`it()` reset, so the wording should not be read as per-`it()`
+  isolation. A row written in one `it()` is visible to a later `it()` in the same file. The
+  spike's helper (`migrateSpikeDb` → `dropExistingAuthTables`) is now
   self-cleaning: before each migration it drops every Better-Auth-managed table (the set derived
   from `getAuthTables(auth.options)`, imported from `better-auth/db` — not a hardcoded name list,
   so non-auth application tables are never touched) in reverse creation order (FK-referencing
@@ -228,10 +230,13 @@ from those spikes, not a projection.
 - `@cloudflare/vitest-plugin`'s `env`/`SELF` imports from `cloudflare:test` are `@deprecated` in
   favour of `cloudflare:workers` (`import { env } from "cloudflare:workers"`). Phase 0 still uses
   `cloudflare:workers` directly for the module-level `auth` singleton in `packages/api/src/app.ts`
-  (`import { env } from "cloudflare:workers"; export const auth = createAuth(env as Env);`) — this
-  worked on the first try, no lazy-singleton fallback was needed. `apps/idp/src/cloudflare-workers.d.ts`
-  is a hand-written shim declaring the `cloudflare:workers` module, since wrangler 4.125's
-  generated types do not include it.
+  (`import { env } from "cloudflare:workers"; export const auth = createAuth(env);`) — this
+  worked on the first try, no lazy-singleton fallback was needed. wrangler 4.125's generated
+  `worker-configuration.d.ts` **does** declare the `cloudflare:workers` module
+  (`declare module 'cloudflare:workers' { export = CloudflareWorkersModule; }`, with
+  `export const env: Cloudflare.Env`), so no hand-written shim is needed; the earlier
+  `apps/idp/src/cloudflare-workers.d.ts` shim was redundant and was removed in the final-review fix
+  wave.
 - The `SecondaryStorage` type used by `kvSecondaryStorage` is not exported from `better-auth`'s
   public entry points; it lives at `@better-auth/core/db` (re-exported from
   `@better-auth/core/dist/db/index.d.mts`) and is declared as an explicit direct dependency of
@@ -251,13 +256,18 @@ from those spikes, not a projection.
 - Secrets (`AUTH_SECRET`, `SETUP_SECRET`) continue to be typed via `env-secrets.d.ts`, independent
   of `worker-configuration.d.ts`/`.dev.vars` presence.
 - OIDC issuer will be `${APP_URL}/api/auth` by default (S4), not bare `${APP_URL}`. Phase 1 must
-  decide between two options and document the choice before wiring root `.well-known` discovery:
-  1. Accept the issuer with the `/api/auth` basePath, and add a root-level rewrite from
-     `/.well-known/*` to Better-Auth's `/api/auth/.well-known/*` paths so OIDC clients resolving
-     discovery from the bare origin still work.
-  2. Configure Better-Auth's `basePath`/issuer so the mounted path and the issuer align without a
-     root rewrite (e.g. mount at `/` or set an explicit issuer override), accepting whatever
-     trade-off that has for the rest of the `/api/auth/*` route surface.
+  decide between two options and document the choice before wiring root `.well-known` discovery
+  (decision left to the Phase 1 plan; recommended option listed first):
+  1. **Recommended**: set the concrete knob — `@better-auth/oauth-provider`'s `getIssuer` returns
+     `jwt` plugin options `options.jwt.issuer ?? baseURL`, so configuring
+     `jwt({ jwt: { issuer: env.APP_URL } })` yields `issuer = APP_URL` (bare origin, no
+     `/api/auth` suffix) while keeping the existing `/api/auth` mount for every protocol route.
+     Combine with the planned root-level `.well-known/*` rewrites to Better-Auth's
+     `/api/auth/.well-known/*` paths so discovery resolves from the bare origin too. See S4 above
+     for the mount/issuer details this builds on.
+  2. Accept the issuer with the `/api/auth` basePath as-is, and rely solely on a root-level
+     rewrite from `/.well-known/*` to Better-Auth's `/api/auth/.well-known/*` paths so OIDC
+     clients resolving discovery from the bare origin still work, without changing `issuer`.
 - The facade (Phase 5 API surface over Better-Auth) must map passkey verification failures from
   the raw `500 INTERNAL_SERVER_ERROR`/`FAILED_TO_VERIFY_REGISTRATION` Better-Auth returns (S3) to
   a client-appropriate `400` — the failure is entirely client-input-caused, not a server error.
@@ -271,6 +281,12 @@ from those spikes, not a projection.
 - The consent flow needs the SPA to read `location.search` from the `/oauth/consent` redirect and
   forward it back verbatim as `oauth_query` in the consent POST body (S4) — it is not recoverable
   from the session/cookie alone, and the endpoint's `before` hook rejects the request without it.
+- The Phase 2 `/api/oauth/consent` facade cannot call `auth.api.oauth2Consent(...)` directly
+  without a real `Request` — the re-entrant authorize call it triggers unconditionally requires
+  `ctx.request`, plus its own content negotiation needs a real `accept` header (`oauth_query`
+  alone, as `{ body, headers }`, is not enough); it must proxy the consent POST via
+  `auth.handler(new Request(...))`, or otherwise pass a genuine `Request` through, exactly as the
+  S4 spike does (see S4 above).
 - Loopback redirect URIs (`http://localhost:.../callback`, used by native/CLI-style clients)
   require `application_type: "native"` on the OAuth client at creation time (S4) — the default
   `application_type: "web"` unconditionally rejects loopback redirect URIs.
