@@ -1,0 +1,12 @@
+# Git hooks. Installed by `bun install` (package.json "prepare": "lefthook install").
+# Skip once with LEFTHOOK=0 git commit … if you really must.
+pre-commit:
+  parallel: true
+  commands:
+    biome:
+      glob: "*.{js,jsx,ts,tsx,json,jsonc,css}"
+      run: bunx biome check --no-errors-on-unmatched {staged_files}
+commit-msg:
+  commands:
+    commitlint:
+      run: bunx commitlint --edit {1}

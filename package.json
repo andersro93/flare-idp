@@ -1,7 +1,18 @@
 {
   "name": "flare-idp",
+  "version": "0.1.0",
   "private": true,
   "type": "module",
+  "description": "Cloudflare-native Identity Provider (OIDC) built on Better Auth, Hono and React.",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/andersro93/flare-idp.git"
+  },
+  "homepage": "https://github.com/andersro93/flare-idp#readme",
+  "bugs": {
+    "url": "https://github.com/andersro93/flare-idp/issues"
+  },
   "workspaces": [
     "apps/*",
     "packages/*"
@@ -19,10 +30,15 @@
     "test:watch": "bun run --cwd apps/idp test:watch",
     "build": "bun run --cwd apps/idp build",
     "dev": "bun run --cwd apps/idp dev",
-    "ci": "bun run check && bun run typecheck && bun run test && bun run build"
+    "ci": "bun run check && bun run typecheck && bun run test && bun run build",
+    "prepare": "lefthook install",
+    "commitlint": "commitlint"
   },
   "devDependencies": {
     "@biomejs/biome": "2.5.9",
+    "@commitlint/cli": "21.2.2",
+    "@commitlint/config-conventional": "21.2.2",
+    "lefthook": "2.1.10",
     "typescript": "7.0.2"
   }
 }
