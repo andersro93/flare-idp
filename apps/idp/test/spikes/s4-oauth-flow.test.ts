@@ -169,6 +169,8 @@ describe("S4 OAuth2/OIDC on D1", () => {
       refresh_token?: string;
     };
     expect(refreshed.access_token).not.toBe(tokens.access_token);
+    expect(refreshed.refresh_token).toBeTypeOf("string");
+    expect(refreshed.refresh_token).not.toBe(tokens.refresh_token);
 
     // Replaying the authorization code must fail (no transactions on D1 — prove replay protection holds).
     const replay = await auth.handler(
