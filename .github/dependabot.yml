@@ -1,38 +1,14 @@
-# Dependabot keeps dependencies current in small, grouped PRs.
-# Commit messages follow Conventional Commits ("chore(deps): …") so
+# Dependabot keeps GitHub Actions current in small, grouped PRs.
+# Commit messages follow Conventional Commits ("ci(deps): …") so
 # release-please and the commit lint accept them.
 version: 2
 updates:
-  - package-ecosystem: bun
-    directory: /
-    schedule:
-      interval: weekly
-      day: monday
-      time: "06:00"
-      timezone: Europe/Oslo
-    open-pull-requests-limit: 10
-    commit-message:
-      prefix: chore
-      include: scope
-    labels: [dependencies]
-    cooldown:
-      default-days: 3
-    groups:
-      # Better Auth ships core + plugins in lockstep; always bump them together.
-      better-auth:
-        patterns: ["better-auth", "@better-auth/*"]
-      cloudflare:
-        patterns: ["wrangler", "@cloudflare/*", "miniflare"]
-      tanstack:
-        patterns: ["@tanstack/*"]
-      react:
-        patterns: ["react", "react-dom", "@types/react", "@types/react-dom"]
-      vite-vitest:
-        patterns: ["vite", "vitest", "@vitejs/*", "@vitest/*", "jsdom", "@testing-library/*"]
-      hono:
-        patterns: ["hono", "@hono/*", "@scalar/*"]
-      tooling:
-        patterns: ["@biomejs/*", "typescript", "@types/node", "lefthook", "@commitlint/*"]
+  # NOTE: the "bun" ecosystem is intentionally absent. Dependabot's bun updater
+  # only parses bun.lock lockfileVersion <= 1, while bun >= 1.3 writes version 2
+  # ("Unsupported bun.lock 'lockfileVersion' 2"). Package dependencies are
+  # handled by Renovate instead (see renovate.json — install the Mend Renovate
+  # GitHub App on the repository to activate it). Re-add a bun entry here once
+  # Dependabot supports lockfile v2.
   - package-ecosystem: github-actions
     directory: /
     schedule:

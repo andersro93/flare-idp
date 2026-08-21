@@ -49,8 +49,8 @@ All commits **must** follow [Conventional Commits 1.0.0](https://www.conventiona
 
 - A breaking change is marked with `!` after the type/scope (`feat(api)!: …`) and/or a `BREAKING CHANGE:` footer. Before 1.0.0 a breaking change bumps the **minor** version.
 - Suggested scopes: `api`, `auth`, `db`, `web`, `email`, `ci`, `deps`, `docs`, `spike`.
-- Keep the summary in the imperative mood, starting with a lower-case letter (`feat: add …`, not `feat: Add …` or `feat: S8 …`), and under 72 characters (hard limit 100); wrap the body at 100 columns.
-- Dependabot and release-please commits already follow this format.
+- Keep the summary in the imperative mood, preferably starting with a lower-case letter (`feat: add …`), and under 72 characters (hard limit 100); wrap the body at 100 columns.
+- Dependabot, Renovate and release-please commits already follow this format.
 
 ## Pull requests
 

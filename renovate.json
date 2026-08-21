@@ -1,0 +1,66 @@
+{
+  "$schema": "https://docs.renovatebot.com/renovate-schema.json",
+  "description": "Package dependency updates (bun workspaces). Activate by installing the Mend Renovate GitHub App; GitHub Actions are updated by Dependabot.",
+  "extends": [
+    "config:recommended",
+    ":semanticCommits",
+    ":semanticCommitTypeAll(chore)",
+    ":semanticCommitScope(deps)"
+  ],
+  "enabledManagers": ["bun"],
+  "timezone": "Europe/Oslo",
+  "schedule": ["before 7am on monday"],
+  "minimumReleaseAge": "3 days",
+  "rangeStrategy": "pin",
+  "labels": ["dependencies"],
+  "prConcurrentLimit": 10,
+  "lockFileMaintenance": {
+    "enabled": true,
+    "schedule": ["before 7am on the first day of the month"]
+  },
+  "packageRules": [
+    {
+      "groupName": "better-auth",
+      "matchPackageNames": ["better-auth", "/^@better-auth//"]
+    },
+    {
+      "groupName": "cloudflare",
+      "matchPackageNames": ["wrangler", "miniflare", "/^@cloudflare//"]
+    },
+    { "groupName": "tanstack", "matchPackageNames": ["/^@tanstack//"] },
+    {
+      "groupName": "react",
+      "matchPackageNames": [
+        "react",
+        "react-dom",
+        "@types/react",
+        "@types/react-dom"
+      ]
+    },
+    {
+      "groupName": "vite-vitest",
+      "matchPackageNames": [
+        "vite",
+        "vitest",
+        "jsdom",
+        "/^@vitejs//",
+        "/^@vitest//",
+        "/^@testing-library//"
+      ]
+    },
+    {
+      "groupName": "hono",
+      "matchPackageNames": ["hono", "/^@hono//", "/^@scalar//"]
+    },
+    {
+      "groupName": "tooling",
+      "matchPackageNames": [
+        "typescript",
+        "@types/node",
+        "lefthook",
+        "/^@biomejs//",
+        "/^@commitlint//"
+      ]
+    }
+  ]
+}
