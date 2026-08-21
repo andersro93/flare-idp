@@ -8,3 +8,5 @@ coverage/
 .DS_Store
 *.log
 apps/idp/worker-configuration.d.ts
+.startup-profile.cpuprofile
+*.cpuprofile

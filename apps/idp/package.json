@@ -11,7 +11,8 @@
     "types": "wrangler types",
     "test": "vitest run",
     "test:watch": "vitest",
-    "db:apply:local": "wrangler d1 migrations apply flare-idp --local"
+    "db:apply:local": "wrangler d1 migrations apply flare-idp --local",
+    "check:startup": "bash scripts/check-startup.sh"
   },
   "dependencies": {
     "@flare-idp/api": "workspace:*",
