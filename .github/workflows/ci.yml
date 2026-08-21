@@ -1,0 +1,62 @@
+name: CI
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+permissions:
+  contents: read
+
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: 1.4.0
+
+      - name: Install dependencies
+        run: bun install --frozen-lockfile
+
+      # All PRs share one preview D1. Refuse migration numbers that already
+      # exist on main under another name and require the branch to contain
+      # every migration main has.
+      - name: Check migration numbering against main
+        if: github.event_name == 'pull_request'
+        run: |
+          set -euo pipefail
+          git fetch --no-tags --depth=1 origin main
+          mapfile -t main_files < <(git ls-tree --name-only origin/main packages/db/migrations/ | xargs -n1 basename | grep -E '^[0-9]{4}_.*\.sql$' | sort || true)
+          mapfile -t branch_files < <(ls packages/db/migrations | grep -E '^[0-9]{4}_.*\.sql$' | sort)
+          declare -A main_by_number
+          for f in "${main_files[@]}"; do main_by_number["${f:0:4}"]="$f"; done
+          status=0
+          for f in "${branch_files[@]}"; do
+            n="${f:0:4}"
+            if [[ -n "${main_by_number[$n]:-}" && "${main_by_number[$n]}" != "$f" ]]; then
+              echo "::error::packages/db/migrations/$f reuses number $n which main already has as ${main_by_number[$n]}; renumber it"
+              status=1
+            fi
+          done
+          for f in "${main_files[@]}"; do
+            if [[ ! -f "packages/db/migrations/$f" ]]; then
+              echo "::error::packages/db/migrations/$f exists on main but not on this branch; rebase onto main"
+              status=1
+            fi
+          done
+          exit $status
+
+      - name: Lint and format check
+        run: bun run check
+
+      - name: Typecheck
+        run: bun run typecheck
+
+      - name: Test
+        run: bun run test
+
+      - name: Build
+        run: bun run build

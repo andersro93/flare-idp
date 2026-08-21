@@ -17,6 +17,15 @@ export default defineConfig({
           name: "unit",
           environment: "jsdom",
           include: ["test/unit/**/*.test.{ts,tsx}"],
+          exclude: ["test/unit/**(wrangler-config|migrations-lint).test.ts"],
+          setupFiles: ["./test/unit/setup.ts"],
+        },
+      },
+      {
+        test: {
+          name: "unit-fs",
+          environment: "node",
+          include: ["test/unit/**(wrangler-config|migrations-lint).test.ts"],
           setupFiles: ["./test/unit/setup.ts"],
         },
       },
