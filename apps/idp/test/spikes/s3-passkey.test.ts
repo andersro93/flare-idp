@@ -11,7 +11,7 @@ import {
  * is persisted), a bogus attestation is rejected with a clean APIError (not a
  * crash) at its exact real status/code, and authentication options generate.
  *
- * Real behaviour observed on workerd (see docs/decisions.md / task-8-report.md):
+ * Real behaviour observed on workerd (see docs/decisions.md, S3):
  * - `generatePasskeyRegistrationOptions` response: `{ challenge, rp: { name, id },
  *   user: { id, name, displayName }, pubKeyCredParams, timeout, attestation,
  *   excludeCredentials, authenticatorSelection, extensions, hints }`.

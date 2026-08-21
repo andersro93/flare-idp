@@ -11,7 +11,7 @@ describe("S5 Email Service binding in miniflare", () => {
       text: "hello",
       html: "<p>hello</p>",
     });
-    // Real behaviour on @cloudflare/vitest-plugin 4.x + workerd (2026-08): the local
+    // Real behaviour on @cloudflare/vitest-plugin 1.0.0 + workerd (2026-08): the local
     // send_email simulator always resolves a MessageBuilder-style id, never undefined.
     expect(result).toEqual({ messageId: expect.stringMatching(/^<.+@.+>$/) });
   });
@@ -19,7 +19,7 @@ describe("S5 Email Service binding in miniflare", () => {
 
 describe("S5 Queue producer binding", () => {
   it("accepts a message on EMAIL_QUEUE", async () => {
-    // Real behaviour on @cloudflare/vitest-plugin 4.x + workerd (2026-08): Queue#send()
+    // Real behaviour on @cloudflare/vitest-plugin 1.0.0 + workerd (2026-08): Queue#send()
     // resolves a backlog-metrics envelope, not undefined as the brief assumed.
     const result = await env.EMAIL_QUEUE.send({
       kind: "spike",

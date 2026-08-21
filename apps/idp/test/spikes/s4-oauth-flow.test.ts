@@ -99,7 +99,7 @@ describe("S4 OAuth2/OIDC on D1", () => {
     const authz = await auth.handler(
       new Request(authorizeUrl, { headers: jar.headers(), redirect: "manual" }),
     );
-    expect([302, 303, 307]).toContain(authz.status);
+    expect(authz.status).toBe(302);
     const location = new URL(authz.headers.get("location") ?? "");
     expect(location.origin + location.pathname).toBe(REDIRECT_URI);
     expect(location.searchParams.get("state")).toBe("xyz");
@@ -188,7 +188,9 @@ describe("S4 OAuth2/OIDC on D1", () => {
         }),
       }),
     );
-    expect(replay.status).toBeGreaterThanOrEqual(400);
+    expect(replay.status).toBe(400);
+    const replayBody = (await replay.json()) as { error?: string };
+    expect(replayBody.error).toBe("invalid_grant");
   });
 
   it("requires consent for a non-trusted client and accepts it via POST /oauth2/consent", async () => {
@@ -212,6 +214,7 @@ describe("S4 OAuth2/OIDC on D1", () => {
     const authz = await auth.handler(
       new Request(authorizeUrl, { headers: jar.headers(), redirect: "manual" }),
     );
+    expect(authz.status).toBe(302);
     jar.absorb(authz.headers);
     const location = new URL(authz.headers.get("location") ?? "", BASE);
     // Consent required → redirected to our consentPage, not the RP.
@@ -250,16 +253,14 @@ describe("S4 OAuth2/OIDC on D1", () => {
       }),
     );
     jar.absorb(consentRes.headers);
-    expect(consentRes.status).toBe(200);
-    const body = (await consentRes.json()) as Record<string, unknown>;
-    const redirectTo = Object.values(body).find(
-      (v) => typeof v === "string" && v.startsWith(REDIRECT_URI),
-    ) as string | undefined;
-    expect(
-      redirectTo,
-      `consent response: ${JSON.stringify(body)}`,
-    ).toBeDefined();
-    const code = new URL(redirectTo as string).searchParams.get("code");
+    const consent = {
+      status: consentRes.status,
+      response: (await consentRes.json()) as { redirect: boolean; url: string },
+    };
+    expect(consent.status).toBe(200);
+    expect(consent.response).toMatchObject({ redirect: true });
+    const redirectTo = consent.response.url;
+    const code = new URL(redirectTo).searchParams.get("code");
     expect(code).toBeTypeOf("string");
 
     const basic = btoa(`${client.client_id}:${client.client_secret}`);

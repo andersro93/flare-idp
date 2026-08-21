@@ -1,3 +1,8 @@
+// SPIKE CONFIGURATION — NOT PRODUCTION. Phase 0 only.
+// Phase 1 replaces this with: allowlisted Better-Auth mount (protocol routes only),
+// Drizzle adapter + generated schema, rate limiting, secure cookies, invite-only sign-up.
+// Key risk here: `rateLimit.enabled: false`, `advanced.useSecureCookies: false`, and open
+// email+password sign-up (`emailAndPassword.enabled: true`) with no invite gate.
 import { oauthProvider } from "@better-auth/oauth-provider";
 import { passkey } from "@better-auth/passkey";
 import { betterAuth } from "better-auth";
