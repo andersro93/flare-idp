@@ -303,6 +303,23 @@ const deleteRoute = createRoute({
   },
 });
 
+// NOTE on the `auth.api.getOAuthClient(s)` / `adminUpdateOAuthClient` /
+// `rotateClientSecret` / `deleteOAuthClient` calls below: `clientPrivileges`
+// is intentionally unset (see auth.ts), but that does NOT make these calls
+// privilege-free for any admin — the plugin still resolves the calling
+// session and enforces ROW OWNERSHIP (`client.userId === session.user.id`),
+// independent of `requireAdmin` above. `adminCreateOAuthClient` stamps the
+// new row's `userId` with the creating admin's own session user id, so
+// every client any one admin creates stays fully manageable through this
+// facade by that SAME admin — fine today, since exactly one admin exists.
+// If a second admin account ever lands (Phase 6), a client created by admin
+// A will 401 (ownership mismatch, not a 403) when admin B tries to
+// get/patch/rotate/delete it here. The fix then is the plugin's
+// `clientReference` mechanism (map every client to a shared reference id
+// instead of a per-user `userId`, e.g. "the org" or "the admin group") so
+// clients become globally admin-managed — NOT `clientPrivileges`, which
+// only gates the action itself and does not bypass the ownership check.
+
 // `.openapi()` calls MUST be chained directly off `newRouter()`'s result and
 // the return captured (see account.ts for the full explanation of why); the
 // `.use()` calls below are bare statements for the same reason.
@@ -394,19 +411,34 @@ export const adminOauthClientRoutes = adminOauthClientRoutesBase
       applicationType: body.applicationType,
     });
 
+    // Build `update` with ONLY the keys the caller actually provided.
+    // `adminUpdateOAuthClient` merges this object onto the STORED client
+    // (`{ ...stored, ...updates }`) and then re-runs full client validation
+    // (`applyOAuthClientRegistrationDefaults` + `checkOAuthClient`) against
+    // the merged result — an explicit `key: undefined` for an omitted field
+    // is still an own property, so a naive "always send all six keys" object
+    // would overwrite every unpatched field to `undefined`, which
+    // `applyOAuthClientRegistrationDefaults` then re-defaults (e.g.
+    // `grant_types` back to `["authorization_code"]`), silently discarding
+    // the client's real stored values and potentially failing validation
+    // (e.g. the redirect-URI-required check) on a patch that never touched
+    // those fields. `application_type` is only computed/included when
+    // `redirectUris` was provided — it's meaningless (and must not force
+    // `"native"`) on a patch that isn't touching redirect URIs.
+    const update: Record<string, unknown> = {};
+    if (body.name !== undefined) update.client_name = body.name;
+    if (body.redirectUris !== undefined)
+      update.redirect_uris = body.redirectUris;
+    if (body.grantTypes !== undefined) update.grant_types = body.grantTypes;
+    if (body.scope !== undefined) update.scope = body.scope.join(" ");
+    if (body.skipConsent !== undefined) update.skip_consent = body.skipConsent;
+    if (body.redirectUris !== undefined && applicationType !== undefined) {
+      update.application_type = applicationType;
+    }
+
     const updated = await callAuth(c, () =>
       auth.api.adminUpdateOAuthClient({
-        body: {
-          client_id: clientId,
-          update: {
-            client_name: body.name,
-            redirect_uris: body.redirectUris,
-            grant_types: body.grantTypes,
-            scope: body.scope?.join(" "),
-            skip_consent: body.skipConsent,
-            application_type: applicationType,
-          },
-        },
+        body: { client_id: clientId, update },
         headers: c.req.raw.headers,
         returnHeaders: true,
       }),

@@ -219,6 +219,15 @@ describe("POST /api/admin/oauth-clients", () => {
     const body = errorBodySchema.parse(await res.json());
     expect(body.error.code).toBe("invalid_request");
   });
+
+  it("rejects an out-of-enum grant type (400 invalid_request)", async () => {
+    const adminJar = await setupAdmin();
+
+    const res = await createClient(adminJar, { grantTypes: ["implicit"] });
+    expect(res.status).toBe(400);
+    const body = errorBodySchema.parse(await res.json());
+    expect(body.error.code).toBe("invalid_request");
+  });
 });
 
 describe("GET /api/admin/oauth-clients/:clientId", () => {
@@ -324,6 +333,60 @@ describe("PATCH /api/admin/oauth-clients/:clientId", () => {
     ]);
 
     expect(await auditCountFor("oauth_client.updated")).toBe(1);
+  });
+
+  // Regression: the update body must only carry the fields the caller
+  // actually provided. Sending the other (unpatched) fields as explicit
+  // `undefined` lets Better-Auth's `{ ...stored, ...updates }` merge wipe
+  // them, which its own re-validation then re-defaults (e.g. `grant_types`
+  // back to `["authorization_code"]`) — a rename-only or scope-only patch
+  // must not touch `redirectUris` at all.
+  it("renames a client without touching its redirectUris (200)", async () => {
+    const adminJar = await setupAdmin();
+    const createRes = await createClient(adminJar);
+    const { client } = (await createRes.json()) as CreateResponseBody;
+
+    const res = await api(
+      `${BASE}/${client.clientId}`,
+      { method: "PATCH", body: JSON.stringify({ name: "Renamed Client" }) },
+      adminJar,
+    );
+    expect(res.status).toBe(200);
+    const body = (await res.json()) as {
+      name?: string;
+      redirectUris: string[];
+    };
+    expect(body.name).toBe("Renamed Client");
+    expect(body.redirectUris).toEqual(client.redirectUris);
+
+    const getRes = await api(`${BASE}/${client.clientId}`, {}, adminJar);
+    const getBody = (await getRes.json()) as {
+      name?: string;
+      redirectUris: string[];
+    };
+    expect(getBody.name).toBe("Renamed Client");
+    expect(getBody.redirectUris).toEqual(client.redirectUris);
+  });
+
+  it("toggles skipConsent alone without touching other fields (200)", async () => {
+    const adminJar = await setupAdmin();
+    const createRes = await createClient(adminJar, { skipConsent: false });
+    const { client } = (await createRes.json()) as CreateResponseBody;
+
+    const res = await api(
+      `${BASE}/${client.clientId}`,
+      { method: "PATCH", body: JSON.stringify({ skipConsent: true }) },
+      adminJar,
+    );
+    expect(res.status).toBe(200);
+    const body = (await res.json()) as {
+      skipConsent?: boolean;
+      redirectUris: string[];
+      name?: string;
+    };
+    expect(body.skipConsent).toBe(true);
+    expect(body.redirectUris).toEqual(client.redirectUris);
+    expect(body.name).toBe(client.name);
   });
 });
 
