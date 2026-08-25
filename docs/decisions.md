@@ -371,3 +371,11 @@ builds these URLs itself from the `redirectTo`/`callbackURL` this facade passes 
 The Phase 3 SPA's `/reset-password/:token` and `/verify-email` pages must parse the token
 accordingly (route param vs. `URLSearchParams`) — they are not interchangeable, and getting this
 wrong silently drops the token rather than erroring.
+
+## Deployment (2026-08-25)
+
+- Production deployed to the **ROs-Nett** Cloudflare account, custom domain **https://idp.ros-nett.com** (`routes: custom_domain` in the `production` env of `apps/idp/wrangler.jsonc`). Resources: D1 `flare-idp` (`ff8c09dd-e99b-4d3e-b08e-af33e3af951b`), KV `flare-idp-kv` (`d0c0bf4ba8384a7485ea85f77d497f4e`), queues `flare-idp-email` / `flare-idp-email-dlq`.
+- **Continuous deployment**: the `deploy-production` job in `ci.yml` runs on every green push to `main` (migrations → build → deploy → smoke). It skips with a notice until the `CLOUDFLARE_API_TOKEN` repo secret exists.
+- **From the first production deploy, D1 migrations are append-only.** The Phase 1 renumbering trick (deleting `0001` and regenerating `0000_init`) is no longer available; every schema change is a new drizzle-kit migration applied on top.
+- `wrangler types` runs with `--strict-vars=false`: with per-env vars, strict mode emits literal-union types for `ENVIRONMENT`/`APP_URL` that break comparisons against test-injected values.
+- Email sending stays inert until the ros-nett.com sending domain is onboarded to Cloudflare Email Service (dashboard step); email jobs retry into the DLQ meanwhile. `OUTBOUND_EMAIL_FROM=noreply@ros-nett.com` in production vars.

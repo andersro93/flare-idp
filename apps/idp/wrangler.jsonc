@@ -48,5 +48,55 @@
       // Invocation logs record full URLs; auth links carry tokens.
       "invocation_logs": false
     }
+  },
+  // Cloudflare account: ROs-Nett. Not a secret; committed so remote
+  // wrangler commands need no CLOUDFLARE_ACCOUNT_ID.
+  "account_id": "cfef229176e71ea694c259a238556c0e",
+  "env": {
+    // Production: https://idp.ros-nett.com. Top-level keys above are the
+    // LOCAL DEV config; non-inheritable keys (bindings, vars, routes,
+    // triggers) are repeated here with the real resource ids.
+    // Secrets (AUTH_SECRET, SETUP_SECRET) are set with
+    // `wrangler secret put <NAME> --env production`, never in this file.
+    "production": {
+      "name": "flare-idp",
+      "routes": [{ "pattern": "idp.ros-nett.com", "custom_domain": true }],
+      "d1_databases": [
+        {
+          "binding": "DB",
+          "database_name": "flare-idp",
+          "database_id": "ff8c09dd-e99b-4d3e-b08e-af33e3af951b",
+          "migrations_dir": "../../packages/db/migrations"
+        }
+      ],
+      "kv_namespaces": [
+        { "binding": "KV", "id": "d0c0bf4ba8384a7485ea85f77d497f4e" }
+      ],
+      "queues": {
+        "producers": [{ "binding": "EMAIL_QUEUE", "queue": "flare-idp-email" }],
+        "consumers": [
+          {
+            "queue": "flare-idp-email",
+            "max_batch_size": 10,
+            "max_retries": 3,
+            "dead_letter_queue": "flare-idp-email-dlq"
+          }
+        ]
+      },
+      "send_email": [{ "name": "EMAIL" }],
+      "triggers": { "crons": ["0 3 * * *"] },
+      "vars": {
+        "APP_NAME": "flare-idp",
+        "APP_URL": "https://idp.ros-nett.com",
+        "ENVIRONMENT": "production",
+        // Better-Auth enables its production safeguards only when NODE_ENV
+        // is set; Workers never set it by themselves.
+        "NODE_ENV": "production",
+        // Sending works once the ros-nett.com domain is onboarded to
+        // Cloudflare Email Service (dashboard step); until then email jobs
+        // retry into the DLQ.
+        "OUTBOUND_EMAIL_FROM": "noreply@ros-nett.com"
+      }
+    }
   }
 }

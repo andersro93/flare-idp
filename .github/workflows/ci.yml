@@ -64,3 +64,75 @@ jobs:
 
       - name: Build
         run: bun run build
+
+  deploy-production:
+    name: Deploy production
+    needs: validate
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    # Serialize deploys; never cancel a running one.
+    concurrency:
+      group: deploy-production
+      cancel-in-progress: false
+    env:
+      CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+      CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+    steps:
+      - name: Check deploy credentials
+        id: creds
+        run: |
+          if [ -z "$CLOUDFLARE_API_TOKEN" ]; then
+            echo "enabled=false" >> "$GITHUB_OUTPUT"
+            echo "::notice::CLOUDFLARE_API_TOKEN secret not set — skipping production deploy."
+          else
+            echo "enabled=true" >> "$GITHUB_OUTPUT"
+          fi
+
+      - uses: actions/checkout@v7
+        if: steps.creds.outputs.enabled == 'true'
+
+      - uses: oven-sh/setup-bun@v2
+        if: steps.creds.outputs.enabled == 'true'
+        with:
+          bun-version: 1.4.0
+
+      - uses: actions/setup-node@v7
+        if: steps.creds.outputs.enabled == 'true'
+        with:
+          node-version: 22
+
+      - name: Install dependencies
+        if: steps.creds.outputs.enabled == 'true'
+        run: bun install --frozen-lockfile
+
+      # Migrations are append-only once applied here; apply BEFORE deploying
+      # so new code never runs against an old schema.
+      - name: Apply D1 migrations (production)
+        if: steps.creds.outputs.enabled == 'true'
+        working-directory: apps/idp
+        run: bunx wrangler d1 migrations apply flare-idp --remote --env production
+
+      - name: Build (production)
+        if: steps.creds.outputs.enabled == 'true'
+        working-directory: apps/idp
+        env:
+          CLOUDFLARE_ENV: production
+        run: bun run build
+
+      - name: Deploy
+        if: steps.creds.outputs.enabled == 'true'
+        working-directory: apps/idp
+        run: bunx wrangler deploy
+
+      - name: Post-deploy smoke
+        if: steps.creds.outputs.enabled == 'true'
+        run: |
+          set -euo pipefail
+          for i in 1 2 3 4 5; do
+            ready=$(curl -fsS --max-time 15 https://idp.ros-nett.com/api/health/ready || true)
+            if echo "$ready" | grep -q '"ok"'; then break; fi
+            if [ "$i" = "5" ]; then echo "::error::/api/health/ready did not become ok: $ready"; exit 1; fi
+            sleep 5
+          done
+          curl -fsS --max-time 15 https://idp.ros-nett.com/.well-known/jwks.json | grep -q '"keys"'
+          echo "Smoke passed: health ready + JWKS served."

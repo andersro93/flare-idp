@@ -110,15 +110,19 @@ Useful scripts (run from the repo root):
 
 ## Deployment
 
-Deployment targets live in `apps/idp/wrangler.jsonc` as Wrangler environments (`preview`, `production`). The GitHub Actions workflows deploy a preview from `main` and production from release tags once Phase 3 lands; until then, deploy manually:
+Production runs at **https://idp.ros-nett.com** (Cloudflare Workers, custom domain). The `production` Wrangler environment lives in `apps/idp/wrangler.jsonc` with the real D1/KV/Queue ids.
+
+**Continuous deployment:** every push to `main` that passes CI (lint, typecheck, all tests, build) triggers the `deploy-production` job in `.github/workflows/ci.yml`: apply D1 migrations → production build → `wrangler deploy` → post-deploy smoke (`/api/health/ready`, `/.well-known/jwks.json`). The job needs the `CLOUDFLARE_API_TOKEN` and `CLOUDFLARE_ACCOUNT_ID` repository secrets and skips with a notice if they are absent. Because production has live data, **D1 migrations are append-only** — never renumber or rewrite an applied migration.
+
+Manual deploy (same steps CI runs):
 
 ```sh
 cd apps/idp
 bunx wrangler d1 migrations apply flare-idp --remote --env production
-bun run build && bunx wrangler deploy --env production
+CLOUDFLARE_ENV=production bun run build && bunx wrangler deploy
 ```
 
-Secrets (`AUTH_SECRET`, `SETUP_SECRET`, social-provider keys) are set with `wrangler secret put` and never stored in the repo.
+Secrets (`AUTH_SECRET`, `SETUP_SECRET`, social-provider keys) are set with `wrangler secret put <NAME> --env production` and never stored in the repo. Outbound email requires the sending domain to be onboarded to Cloudflare Email Service (dashboard) — until then queued emails retry into the DLQ.
 
 ## Roadmap
 

@@ -25,6 +25,27 @@ type WranglerConfig = {
   send_email?: Array<{ name: string }>;
   observability?: { logs?: { invocation_logs?: boolean } };
   vars?: Record<string, unknown>;
+  account_id?: string;
+  env?: Record<
+    string,
+    {
+      name?: string;
+      routes?: Array<{ pattern: string; custom_domain?: boolean }>;
+      d1_databases?: Array<{
+        binding: string;
+        database_name: string;
+        database_id: string;
+        migrations_dir?: string;
+      }>;
+      kv_namespaces?: Array<{ binding: string; id: string }>;
+      queues?: {
+        producers?: Array<{ binding: string; queue: string }>;
+        consumers?: Array<{ queue: string; dead_letter_queue?: string }>;
+      };
+      send_email?: Array<{ name: string }>;
+      vars?: Record<string, string>;
+    }
+  >;
 };
 
 function loadWranglerConfig(): WranglerConfig {
@@ -79,5 +100,51 @@ describe("wrangler.jsonc deployment contract", () => {
     const from = config.vars?.OUTBOUND_EMAIL_FROM;
     expect(typeof from).toBe("string");
     expect((from as string).length).toBeGreaterThan(0);
+  });
+});
+
+describe("wrangler.jsonc production environment contract", () => {
+  const production = loadWranglerConfig().env?.production;
+
+  it("exists and serves the custom domain idp.ros-nett.com", () => {
+    expect(production).toBeDefined();
+    expect(production?.routes).toEqual([
+      { pattern: "idp.ros-nett.com", custom_domain: true },
+    ]);
+  });
+
+  it("binds real (non-placeholder) production resources", () => {
+    expect(production?.d1_databases?.[0]).toMatchObject({
+      binding: "DB",
+      database_name: "flare-idp",
+      migrations_dir: "../../packages/db/migrations",
+    });
+    expect(production?.d1_databases?.[0]?.database_id).not.toBe(
+      "local-dev-unused",
+    );
+    expect(production?.d1_databases?.[0]?.database_id).toMatch(
+      /^[0-9a-f-]{36}$/,
+    );
+    expect(production?.kv_namespaces?.[0]?.binding).toBe("KV");
+    expect(production?.kv_namespaces?.[0]?.id).toMatch(/^[0-9a-f]{32}$/);
+    expect(production?.queues?.producers?.[0]?.queue).toBe("flare-idp-email");
+    expect(production?.queues?.consumers?.[0]?.dead_letter_queue).toBe(
+      "flare-idp-email-dlq",
+    );
+    expect(production?.send_email?.[0]?.name).toBe("EMAIL");
+  });
+
+  it("pins the production vars an IdP depends on", () => {
+    expect(production?.vars?.APP_URL).toBe("https://idp.ros-nett.com");
+    expect(production?.vars?.ENVIRONMENT).toBe("production");
+    // Better-Auth only enforces its production safeguards when NODE_ENV is set.
+    expect(production?.vars?.NODE_ENV).toBe("production");
+    expect(production?.vars?.OUTBOUND_EMAIL_FROM).toContain("@");
+  });
+
+  it("never carries secrets in vars", () => {
+    for (const key of Object.keys(production?.vars ?? {})) {
+      expect(key).not.toMatch(/SECRET|TOKEN|KEY|PASSWORD/i);
+    }
   });
 });
