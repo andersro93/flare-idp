@@ -387,6 +387,47 @@ describe("PATCH /api/admin/oauth-clients/:clientId", () => {
     expect(body.skipConsent).toBe(true);
     expect(body.redirectUris).toEqual(client.redirectUris);
     expect(body.name).toBe(client.name);
+
+    const getRes = await api(`${BASE}/${client.clientId}`, {}, adminJar);
+    const getBody = (await getRes.json()) as {
+      skipConsent?: boolean;
+      redirectUris: string[];
+      name?: string;
+    };
+    expect(getBody.skipConsent).toBe(true);
+    expect(getBody.redirectUris).toEqual(client.redirectUris);
+    expect(getBody.name).toBe(client.name);
+  });
+
+  // Regression: a patch that touches ONLY `applicationType` (no
+  // `redirectUris` in the body at all) must still apply — the update-body
+  // builder above must not gate `application_type` on `redirectUris` also
+  // being present in the same patch.
+  it("applies a standalone applicationType patch with no redirectUris in the body (200)", async () => {
+    const adminJar = await setupAdmin();
+    // The default https, non-loopback redirect URI is valid for both "web"
+    // and "native" application types, so this patch is otherwise a no-op
+    // apart from the field under test.
+    const createRes = await createClient(adminJar);
+    const { client } = (await createRes.json()) as CreateResponseBody;
+    expect(client.applicationType).not.toBe("native");
+
+    const res = await api(
+      `${BASE}/${client.clientId}`,
+      { method: "PATCH", body: JSON.stringify({ applicationType: "native" }) },
+      adminJar,
+    );
+    expect(res.status).toBe(200);
+    const body = (await res.json()) as {
+      applicationType?: string;
+      redirectUris: string[];
+    };
+    expect(body.applicationType).toBe("native");
+    expect(body.redirectUris).toEqual(client.redirectUris);
+
+    const getRes = await api(`${BASE}/${client.clientId}`, {}, adminJar);
+    const getBody = (await getRes.json()) as { applicationType?: string };
+    expect(getBody.applicationType).toBe("native");
   });
 });
 

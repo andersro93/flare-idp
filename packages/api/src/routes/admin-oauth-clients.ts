@@ -422,9 +422,12 @@ export const adminOauthClientRoutes = adminOauthClientRoutesBase
     // `grant_types` back to `["authorization_code"]`), silently discarding
     // the client's real stored values and potentially failing validation
     // (e.g. the redirect-URI-required check) on a patch that never touched
-    // those fields. `application_type` is only computed/included when
-    // `redirectUris` was provided — it's meaningless (and must not force
-    // `"native"`) on a patch that isn't touching redirect URIs.
+    // those fields. `application_type` is included whenever the computed
+    // value is defined — either the caller patched it directly (no
+    // `redirectUris` in the body at all) or a loopback URI in a patched
+    // `redirectUris` forced it to `"native"` (`applyClientPolicy` only ever
+    // returns a value here in one of those two cases — never a stale
+    // leftover from a previous, unrelated patch).
     const update: Record<string, unknown> = {};
     if (body.name !== undefined) update.client_name = body.name;
     if (body.redirectUris !== undefined)
@@ -432,7 +435,7 @@ export const adminOauthClientRoutes = adminOauthClientRoutesBase
     if (body.grantTypes !== undefined) update.grant_types = body.grantTypes;
     if (body.scope !== undefined) update.scope = body.scope.join(" ");
     if (body.skipConsent !== undefined) update.skip_consent = body.skipConsent;
-    if (body.redirectUris !== undefined && applicationType !== undefined) {
+    if (applicationType !== undefined) {
       update.application_type = applicationType;
     }
 
