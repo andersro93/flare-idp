@@ -1,6 +1,6 @@
 import { cloudflareEmailSender, type EmailJob } from "@flare-idp/email";
 import { z } from "zod";
-import { logEvent } from "../http/log";
+import { errorTypeOf, logEvent } from "../http/log";
 
 /**
  * Small inline validator — deliberately not `@flare-idp/shared`'s
@@ -62,9 +62,15 @@ export async function handleQueue(
       await sender.send(parsed.data);
       message.ack();
     } catch (error) {
+      // Never the error's message: a sender error echoing any part of the
+      // request would leak the job's token-bearing verification/reset URL
+      // into production logs (see `errorTypeOf`). Kind and attempt count
+      // are safe; `to`/`url` are deliberately absent.
       logEvent("error", "email_job_send_failed", {
         id: message.id,
-        message: error instanceof Error ? error.message : String(error),
+        kind: parsed.data.kind,
+        attempts: message.attempts,
+        errorType: errorTypeOf(error),
       });
       message.retry();
     }

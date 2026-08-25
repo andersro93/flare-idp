@@ -2,7 +2,7 @@ import type { ErrorCode } from "@flare-idp/shared";
 import type { Context } from "hono";
 import { HTTPException } from "hono/http-exception";
 import type { ContentfulStatusCode } from "hono/utils/http-status";
-import { logEvent } from "./log";
+import { errorTypeOf, logEvent } from "./log";
 
 export type ErrorBody = { error: { code: ErrorCode; message: string } };
 
@@ -29,13 +29,8 @@ function nearestCodeFor(status: number): ErrorCode {
  * `HTTPException` -> mapped to the nearest error code; anything else is an
  * unhandled programming error, logged and answered as a generic 500 so
  * internals never leak — in EITHER direction: the response body never
- * carries the error's message, and neither does the log line. Arbitrary
- * `Error#message`s embed secrets (drizzle-orm's `DrizzleQueryError` message
- * is literally the failed SQL plus every bound parameter — plaintext
- * verification/reset tokens included), and `console.*` reaches Workers Logs
- * in production. Only a non-identifying type descriptor is logged;
- * `constructor.name` rather than `Error#name` because subclasses like
- * `DrizzleQueryError` inherit the generic `"Error"` name.
+ * carries the error's message, and neither does the log line (see
+ * `errorTypeOf` for why arbitrary messages are radioactive).
  */
 export function handleApiError(err: unknown, c: Context): Response {
   if (err instanceof AppError) {
@@ -50,8 +45,7 @@ export function handleApiError(err: unknown, c: Context): Response {
   }
 
   logEvent("error", "unhandled_error", {
-    errorType:
-      err instanceof Error ? (err.constructor?.name ?? err.name) : typeof err,
+    errorType: errorTypeOf(err),
     path: c.req.path,
     method: c.req.method,
   });

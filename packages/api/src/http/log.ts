@@ -22,6 +22,21 @@ export function logEvent(
   }
 }
 
+/**
+ * Non-identifying descriptor for a caught arbitrary error, safe to log.
+ * NEVER log an arbitrary error's `message` — e.g. drizzle-orm's
+ * `DrizzleQueryError` message embeds the failed SQL plus every bound
+ * parameter (plaintext verification/reset tokens included), and `console.*`
+ * reaches Workers Logs in production. `constructor.name` rather than
+ * `Error#name` because subclasses like `DrizzleQueryError` inherit the
+ * generic `"Error"` name.
+ */
+export function errorTypeOf(err: unknown): string {
+  return err instanceof Error
+    ? (err.constructor?.name ?? err.name)
+    : typeof err;
+}
+
 /** Request correlation fields: Cloudflare's ray id, method and path. */
 export function requestFields(c: Context): Record<string, unknown> {
   return {
