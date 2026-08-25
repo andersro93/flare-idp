@@ -70,6 +70,9 @@
     "packages/shared": {
       "name": "@flare-idp/shared",
       "version": "0.0.0",
+      "dependencies": {
+        "zod": "4.4.3",
+      },
     },
   },
   "packages": {
