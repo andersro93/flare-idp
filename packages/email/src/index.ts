@@ -1,10 +1,7 @@
-export interface EmailMessage {
-  to: string;
-  subject: string;
-  text: string;
-  html?: string;
-}
-
-export interface EmailSender {
-  send(message: EmailMessage): Promise<void>;
-}
+export { renderEmail } from "./render.js";
+export {
+  captureEmailSender,
+  cloudflareEmailSender,
+  queueEmailSender,
+} from "./senders.js";
+export type { EmailJob, EmailSender, RenderedEmail } from "./types.js";
