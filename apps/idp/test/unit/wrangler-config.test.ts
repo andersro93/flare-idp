@@ -24,6 +24,7 @@ type WranglerConfig = {
   };
   send_email?: Array<{ name: string }>;
   observability?: { logs?: { invocation_logs?: boolean } };
+  vars?: Record<string, unknown>;
 };
 
 function loadWranglerConfig(): WranglerConfig {
@@ -72,5 +73,11 @@ describe("wrangler.jsonc deployment contract", () => {
   it("preserves dashboard vars and disables invocation logs (URLs carry tokens)", () => {
     expect(config.keep_vars).toBe(true);
     expect(config.observability?.logs?.invocation_logs).toBe(false);
+  });
+
+  it("declares a non-empty OUTBOUND_EMAIL_FROM sender address", () => {
+    const from = config.vars?.OUTBOUND_EMAIL_FROM;
+    expect(typeof from).toBe("string");
+    expect((from as string).length).toBeGreaterThan(0);
   });
 });

@@ -39,7 +39,8 @@
   "vars": {
     "APP_NAME": "flare-idp",
     "APP_URL": "http://localhost:5173",
-    "ENVIRONMENT": "development"
+    "ENVIRONMENT": "development",
+    "OUTBOUND_EMAIL_FROM": "noreply@example.com"
   },
   "observability": {
     "logs": {

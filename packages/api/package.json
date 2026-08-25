@@ -8,9 +8,16 @@
   },
   "dependencies": {
     "@better-auth/core": "1.7.1",
+    "@better-auth/drizzle-adapter": "1.7.1",
     "@better-auth/oauth-provider": "1.7.1",
     "@better-auth/passkey": "1.7.1",
+    "@flare-idp/db": "workspace:*",
+    "@flare-idp/email": "workspace:*",
+    "@flare-idp/shared": "workspace:*",
+    "@hono/zod-openapi": "1.6.1",
+    "@scalar/hono-api-reference": "0.11.16",
     "better-auth": "1.7.1",
-    "hono": "4.13.3"
+    "hono": "4.13.3",
+    "zod": "4.4.3"
   }
 }
