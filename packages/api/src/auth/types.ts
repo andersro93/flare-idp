@@ -6,7 +6,10 @@
  */
 export type SessionFetcher = {
   api: {
-    getSession: (ctx: { headers: Headers }) => Promise<null | {
+    getSession: (ctx: {
+      headers: Headers;
+      query?: { disableCookieCache?: boolean };
+    }) => Promise<null | {
       user: Record<string, unknown> & {
         id: string;
         email: string;

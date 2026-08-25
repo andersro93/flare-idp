@@ -32,6 +32,16 @@ function toSessionUser(user: RawSession["user"]): SessionUser {
  * Sets `user`/`session` context vars; never throws — a session lookup
  * failure is treated as "no session" so the rest of the request can proceed
  * (public routes must still work when the session store is briefly down).
+ *
+ * `disableCookieCache: true` — this is the authoritative session check every
+ * `/api/*` request relies on for authz (`requireAuth`/`requireAdmin`) and for
+ * `GET /api/session`; Better-Auth's cookie cache would otherwise answer
+ * straight from a signed client-side blob for up to `cookieCache.maxAge`
+ * seconds, so a revoked session (sign-out-all, admin ban, password reset)
+ * would still read as valid until that blob expired. The KV secondary
+ * storage (`kvSecondaryStorage`) is the intended read cache instead (Global
+ * Constraints: "KV = session read cache only") — it's consulted by
+ * Better-Auth's internal adapter and stays correctly invalidated on revoke.
  */
 export function loadSession(
   authRef: () => SessionFetcher,
@@ -40,6 +50,7 @@ export function loadSession(
     try {
       const result = await authRef().api.getSession({
         headers: c.req.raw.headers,
+        query: { disableCookieCache: true },
       });
       if (!result) {
         c.set("user", null);

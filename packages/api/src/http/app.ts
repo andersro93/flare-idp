@@ -3,6 +3,7 @@ import { cors } from "hono/cors";
 import { secureHeaders } from "hono/secure-headers";
 import { createAuth } from "../auth/auth";
 import { healthRoutes } from "../routes/health";
+import { sessionRoutes } from "../routes/session";
 import { setupRoutes } from "../routes/setup";
 import { API_VERSION } from "../version";
 import { newRouter } from "./app-shared";
@@ -94,7 +95,8 @@ app.use(
 // nothing after this block should be chained into `routes`.
 const routes = app
   .route("/api/health", healthRoutes)
-  .route("/api/setup", setupRoutes);
+  .route("/api/setup", setupRoutes)
+  .route("/api/session", sessionRoutes);
 export type AppType = typeof routes;
 
 // Better-Auth's own HTTP handler is mounted for an ALLOWLIST of exact paths
