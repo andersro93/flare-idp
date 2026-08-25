@@ -20,9 +20,19 @@ describe("worker handlers", () => {
     await waitOnExecutionContext(ctx);
   });
 
-  it("queue handler acks every message", async () => {
+  it("queue handler delivers a valid job and acks a garbage body", async () => {
     const batch = createMessageBatch("flare-idp-email", [
-      { id: "m1", timestamp: new Date(), body: { kind: "spike" }, attempts: 1 },
+      {
+        id: "m1",
+        timestamp: new Date(),
+        body: {
+          kind: "verify-email",
+          to: "user@example.com",
+          recipientName: "User",
+          url: "https://example.com/verify?token=abc",
+        },
+        attempts: 1,
+      },
       { id: "m2", timestamp: new Date(), body: { kind: "spike" }, attempts: 1 },
     ]);
     const ctx = createExecutionContext();

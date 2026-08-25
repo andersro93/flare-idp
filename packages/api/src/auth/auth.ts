@@ -1,0 +1,87 @@
+// Production Better-Auth core. Keep the plugin list in sync with
+// `packages/db/gen/betterauth-schema.config.ts` (schema-generation-only
+// config for `bun x auth generate`) — a comment in both files says so.
+import { drizzleAdapter } from "@better-auth/drizzle-adapter";
+import { dbFor, schema } from "@flare-idp/db";
+import { type EmailSender, queueEmailSender } from "@flare-idp/email";
+import { betterAuth } from "better-auth/minimal";
+import { admin, jwt } from "better-auth/plugins";
+import { kvSecondaryStorage } from "../kv-secondary-storage";
+
+export type CreateAuthDeps = { emailSender?: EmailSender };
+export type CreateAuthOptions = { allowSignUp?: boolean };
+
+export function createAuth(
+  env: Env,
+  deps: CreateAuthDeps = {},
+  opts: CreateAuthOptions = {},
+) {
+  const sender = deps.emailSender ?? queueEmailSender(env.EMAIL_QUEUE);
+  return betterAuth({
+    appName: env.APP_NAME,
+    baseURL: env.APP_URL,
+    secret: env.AUTH_SECRET,
+    trustedOrigins: [env.APP_URL],
+    database: drizzleAdapter(dbFor(env.DB), {
+      provider: "sqlite",
+      schema,
+      transaction: false,
+    }),
+    secondaryStorage: kvSecondaryStorage(env.KV),
+    session: {
+      storeSessionInDatabase: true,
+      expiresIn: 60 * 60 * 24 * 14,
+      updateAge: 60 * 60 * 24,
+      cookieCache: { enabled: true, maxAge: 300 },
+    },
+    verification: { storeInDatabase: true },
+    emailAndPassword: {
+      enabled: true,
+      // Invite-only: sign-up is disabled everywhere except the one-shot
+      // provisioning instance the setup route constructs with
+      // `{ allowSignUp: true }`.
+      disableSignUp: !opts.allowSignUp,
+      minPasswordLength: 12,
+      maxPasswordLength: 128,
+      revokeSessionsOnPasswordReset: true,
+      sendResetPassword: async ({ user, url }) => {
+        await sender.send({
+          kind: "reset-password",
+          to: user.email,
+          recipientName: user.name ?? user.email,
+          url,
+        });
+      },
+    },
+    emailVerification: {
+      sendVerificationEmail: async ({ user, url }) => {
+        await sender.send({
+          kind: "verify-email",
+          to: user.email,
+          recipientName: user.name ?? user.email,
+          url,
+        });
+      },
+    },
+    // Our D1 limiter (http/security/rate-limit.ts) guards the facade;
+    // Better-Auth's own limiter would only ever see allowlisted routes.
+    rateLimit: { enabled: false },
+    advanced: {
+      database: { generateId: "uuid" },
+      ipAddress: { ipAddressHeaders: ["cf-connecting-ip"] },
+      useSecureCookies:
+        env.ENVIRONMENT !== "development" && env.ENVIRONMENT !== "test",
+    },
+    plugins: [
+      admin({ defaultRole: "user", adminRoles: ["admin"] }),
+      // Issuer knob (docs/decisions.md, recommended option 1): bare-origin
+      // OIDC issuer, keeps the /api/auth mount.
+      jwt({
+        jwt: { issuer: env.APP_URL },
+        jwks: { keyPairConfig: { alg: "EdDSA", crv: "Ed25519" } },
+      }),
+    ],
+  });
+}
+
+export type Auth = ReturnType<typeof createAuth>;

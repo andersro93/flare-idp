@@ -1,8 +1,13 @@
-export { app, auth } from "./app";
-export { type Auth, createAuth } from "./auth";
+export { type Auth, createAuth } from "./auth/auth";
 export { callAuth, mapAuthError } from "./auth/forward";
 export type { SessionFetcher } from "./auth/types";
 export { handleQueue, handleScheduled } from "./handlers";
+export {
+  type AppType,
+  app,
+  auth,
+  BETTER_AUTH_ALLOWLIST,
+} from "./http/app";
 export {
   assertValidEnv,
   type EnvProblem,

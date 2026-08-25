@@ -5,28 +5,26 @@ import { defineConfig } from "vitest/config";
 
 /**
  * `@flare-idp/api`'s barrel (`packages/api/src/index.ts`) re-exports the
- * Phase 0 spike `app`/`auth` singleton (`./app`) alongside the pure
- * http/security modules the `unit` project tests. `app.ts` imports
+ * production `app`/`auth` singleton (`./http/app`) alongside the pure
+ * http/security modules the `unit` project tests. `http/app.ts` imports
  * `cloudflare:workers` and eagerly builds a Better-Auth instance at module
  * scope — neither works outside workerd. Stub ONLY that specific
- * `index.ts -> ./app` edge (scoped by importer, not a blanket "./app"
- * alias — `apps/idp/src/client/main.tsx` and
- * `packages/db/src/schema/index.ts` also import their own unrelated
- * "./app") so the barrel resolves without a workerd runtime. Nothing in the
- * `unit` project touches `app`/`auth`; those are covered by the
- * `integration` project's real Workers runtime. Task 5 deletes the spike
- * and replaces app.ts with http/app.ts — revisit this then.
+ * `index.ts -> ./http/app` edge (scoped by importer, not a blanket alias —
+ * other files import their own unrelated `./app`) so the barrel resolves
+ * without a workerd runtime. Nothing in the `unit` project touches
+ * `app`/`auth`; those are covered by the `integration` project's real
+ * Workers runtime.
  */
-function stubSpikeAuthApp(): Plugin {
+function stubProductionAuthApp(): Plugin {
   const stubPath = fileURLToPath(
     new URL("./test/unit/shims/api-app-stub.ts", import.meta.url),
   );
   return {
-    name: "stub-spike-auth-app",
+    name: "stub-production-auth-app",
     enforce: "pre",
     resolveId(source, importer) {
       if (
-        source === "./app" &&
+        source === "./http/app" &&
         importer?.endsWith("/packages/api/src/index.ts")
       ) {
         return stubPath;
@@ -49,7 +47,7 @@ export default defineConfig({
   test: {
     projects: [
       {
-        plugins: [stubSpikeAuthApp()],
+        plugins: [stubProductionAuthApp()],
         test: {
           name: "unit",
           environment: "jsdom",
@@ -95,10 +93,7 @@ export default defineConfig({
         ],
         test: {
           name: "integration",
-          include: [
-            "test/integration/**/*.test.ts",
-            "test/spikes/**/*.test.ts",
-          ],
+          include: ["test/integration/**/*.test.ts"],
           setupFiles: ["./test/integration/setup.ts"],
           testTimeout: 30_000,
         },

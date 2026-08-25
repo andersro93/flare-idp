@@ -26,4 +26,10 @@ describe("worker skeleton", () => {
     ).first<{ status: string }>();
     expect(row?.status).toBe("pending");
   });
+
+  it("serves /api/health/ready when DB and KV are reachable", async () => {
+    const res = await SELF.fetch("http://localhost/api/health/ready");
+    expect(res.status).toBe(200);
+    expect(await res.json()).toEqual({ status: "ok" });
+  });
 });

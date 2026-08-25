@@ -12,7 +12,8 @@
     "test": "vitest run",
     "test:watch": "vitest",
     "db:apply:local": "wrangler d1 migrations apply flare-idp --local",
-    "check:startup": "bash scripts/check-startup.sh"
+    "check:startup": "bash scripts/check-startup.sh",
+    "vendor:scalar": "bun scripts/vendor-scalar.ts"
   },
   "dependencies": {
     "@flare-idp/api": "workspace:*",
@@ -25,6 +26,7 @@
   "devDependencies": {
     "@cloudflare/vite-plugin": "1.53.1",
     "@cloudflare/vitest-plugin": "1.0.0",
+    "@scalar/api-reference": "1.66.1",
     "@testing-library/jest-dom": "7.0.1",
     "@testing-library/react": "16.3.2",
     "@types/node": "26.2.0",
