@@ -10,6 +10,7 @@ import {
   clientAddress,
   RATE_LIMITS,
   rateLimit,
+  userScopedKey,
 } from "../http/security/rate-limit";
 
 function errorResponse(description: string) {
@@ -73,6 +74,7 @@ const resendRoute = createRoute({
     },
     401: errorResponse("Authentication required."),
     403: errorResponse("Cross-site request rejected."),
+    429: errorResponse("Too many requests; retry later."),
   },
 });
 
@@ -101,6 +103,12 @@ const emailVerificationRoutesBase = newRouter();
 // `/resend` requires a session.
 emailVerificationRoutesBase.use("/verify", rateLimit(RATE_LIMITS.emailVerify));
 emailVerificationRoutesBase.use("/resend", requireAuth);
+// Registered AFTER requireAuth (registration order) so `user` is already set
+// on context — the rate limit is keyed per user, not per IP.
+emailVerificationRoutesBase.use(
+  "/resend",
+  rateLimit(RATE_LIMITS.emailResend, userScopedKey),
+);
 
 export const emailVerificationRoutes = emailVerificationRoutesBase
   .openapi(verifyRoute, async (c) => {

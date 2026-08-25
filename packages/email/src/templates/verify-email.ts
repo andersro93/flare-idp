@@ -8,6 +8,7 @@ export function renderVerifyEmail(
 ): RenderedEmail {
   const safeRecipientName = escapeHtml(recipientName);
   const safeUrl = escapeHtml(url);
+  const safeAppName = escapeHtml(appName);
 
   return {
     subject: `Verify your email for ${appName}`,
@@ -21,7 +22,7 @@ export function renderVerifyEmail(
     ].join("\n"),
     html: `
       <p>Hi ${safeRecipientName},</p>
-      <p>Please verify your email address to complete your ${appName} account setup.</p>
+      <p>Please verify your email address to complete your ${safeAppName} account setup.</p>
       <p><a href="${safeUrl}">Verify your email</a></p>
       <p>If you did not request this, you can safely ignore this email.</p>
     `,

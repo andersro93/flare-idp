@@ -8,6 +8,7 @@ export function renderResetPassword(
 ): RenderedEmail {
   const safeRecipientName = escapeHtml(recipientName);
   const safeUrl = escapeHtml(url);
+  const safeAppName = escapeHtml(appName);
 
   return {
     subject: `Reset your ${appName} password`,
@@ -21,7 +22,7 @@ export function renderResetPassword(
     ].join("\n"),
     html: `
       <p>Hi ${safeRecipientName},</p>
-      <p>We received a request to reset your ${appName} password.</p>
+      <p>We received a request to reset your ${safeAppName} password.</p>
       <p><a href="${safeUrl}">Reset your password</a></p>
       <p>If you did not request this, you can safely ignore this email.</p>
     `,

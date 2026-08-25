@@ -1,5 +1,6 @@
 import type { Context, MiddlewareHandler } from "hono";
 import { errorBody } from "../errors";
+import type { AppEnv } from "../types";
 
 export type RateLimitRule = {
   /** Short label used in the storage key, e.g. "setup". */
@@ -76,8 +77,8 @@ export async function consumeRateLimit(
  */
 export function rateLimit(
   rule: RateLimitRule,
-  keyFn?: (c: Context<{ Bindings: Env }>) => string,
-): MiddlewareHandler<{ Bindings: Env }> {
+  keyFn?: (c: Context<AppEnv>) => string,
+): MiddlewareHandler<AppEnv> {
   return async (c, next) => {
     const clientKey = keyFn ? keyFn(c) : clientAddress(c.req.raw.headers);
     const decision = await consumeRateLimit(c.env.DB, rule, clientKey);
@@ -100,4 +101,16 @@ export const RATE_LIMITS = {
   passwordForgot: { name: "pw-forgot", windowSeconds: 300, max: 3 },
   passwordReset: { name: "pw-reset", windowSeconds: 300, max: 5 },
   emailVerify: { name: "email-verify", windowSeconds: 300, max: 10 },
+  passwordChange: { name: "pw-change", windowSeconds: 300, max: 5 },
+  emailResend: { name: "email-resend", windowSeconds: 600, max: 3 },
 } as const;
+
+/**
+ * Rate-limit key for an authenticated route: keys by the session user's id
+ * when one is set on context, else falls back to the client IP. Only
+ * meaningful when registered AFTER `requireAuth` in the middleware chain,
+ * so `user` is already populated.
+ */
+export function userScopedKey(c: Context<AppEnv>): string {
+  return c.get("user")?.id ?? clientAddress(c.req.raw.headers);
+}

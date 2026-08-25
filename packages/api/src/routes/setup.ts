@@ -16,7 +16,11 @@ import { newRouter } from "../http/app-shared";
 import { AppError } from "../http/errors";
 import { sessionUserResponseSchema } from "../http/openapi-schemas";
 import { secretsEqual } from "../http/security/compare";
-import { RATE_LIMITS, rateLimit } from "../http/security/rate-limit";
+import {
+  clientAddress,
+  RATE_LIMITS,
+  rateLimit,
+} from "../http/security/rate-limit";
 
 const statusSchema = z.object({
   status: z.enum(["pending", "in_progress", "complete"]),
@@ -166,7 +170,7 @@ export const setupRoutes = setupRoutesBase
       await recordAuditEvent(db, {
         event: "setup.completed",
         actorUserId: result.user.id,
-        actorIp: c.req.header("cf-connecting-ip") ?? null,
+        actorIp: clientAddress(c.req.raw.headers),
         target: result.user.email,
       });
 
@@ -185,6 +189,9 @@ export const setupRoutes = setupRoutesBase
         201,
       );
     } catch (error) {
+      // Safe only because recordAuditEvent never throws and completeInstallation
+      // is the last mutating call — a post-completion throw would wrongly
+      // reset a completed install.
       await releaseInstallation(db);
       throw error;
     }

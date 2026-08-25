@@ -17,6 +17,7 @@ import {
   clientAddress,
   RATE_LIMITS,
   rateLimit,
+  userScopedKey,
 } from "../http/security/rate-limit";
 
 function errorResponse(description: string) {
@@ -92,6 +93,7 @@ const changeRoute = createRoute({
     ),
     401: errorResponse("Authentication required."),
     403: errorResponse("Cross-site request rejected."),
+    429: errorResponse("Too many requests; retry later."),
   },
 });
 
@@ -121,6 +123,12 @@ const passwordRoutesBase = newRouter();
 passwordRoutesBase.use("/forgot", rateLimit(RATE_LIMITS.passwordForgot));
 passwordRoutesBase.use("/reset", rateLimit(RATE_LIMITS.passwordReset));
 passwordRoutesBase.use("/change", requireAuth);
+// Registered AFTER requireAuth (registration order) so `user` is already set
+// on context — the rate limit is keyed per user, not per IP.
+passwordRoutesBase.use(
+  "/change",
+  rateLimit(RATE_LIMITS.passwordChange, userScopedKey),
+);
 
 export const passwordRoutes = passwordRoutesBase
   .openapi(forgotRoute, async (c) => {
@@ -201,9 +209,11 @@ export const passwordRoutes = passwordRoutesBase
       );
     } catch (error) {
       // Simpler and safer than trying to distinguish Better-Auth's error
-      // codes here: any failure from changePassword (wrong current password,
-      // no credential account, etc.) reads as `invalid_credentials`.
-      if (error instanceof AppError) {
+      // codes here: any CLIENT failure from changePassword (wrong current
+      // password, no credential account, etc.) reads as `invalid_credentials`.
+      // A 5xx (e.g. an internal Better-Auth error) must propagate as-is —
+      // never masquerade a server error as a 400.
+      if (error instanceof AppError && error.status < 500) {
         throw new AppError(
           400,
           "invalid_credentials",

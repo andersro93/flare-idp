@@ -34,7 +34,13 @@ export function mapAuthError(error: unknown): unknown {
       return new AppError(429, "rate_limited", message);
     case "BAD_REQUEST":
       return new AppError(400, "invalid_request", message);
+    case "INTERNAL_SERVER_ERROR":
+      // Never forward Better-Auth's internal message to the caller.
+      return new AppError(500, "internal", "Internal error");
     default:
-      return new AppError(400, "invalid_request", message);
+      // Unrecognized statuses are treated as server errors, not 400s — an
+      // unmapped Better-Auth status is a bug in this mapping, not a bad
+      // request, and its message must not leak either.
+      return new AppError(500, "internal", "Internal error");
   }
 }

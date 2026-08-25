@@ -35,6 +35,7 @@ function strictContentSecurityPolicy() {
     objectSrc: ["'none'"],
     baseUri: ["'none'"],
     frameAncestors: ["'none'"],
+    formAction: ["'self'"],
   };
 }
 
@@ -111,8 +112,14 @@ export type AppType = typeof routes;
 // allowlist.test.ts).
 export const BETTER_AUTH_ALLOWLIST = ["/api/auth/jwks"] as const;
 
+// Every current allowlist entry is GET-only; revisit when Phase 2 adds
+// POST protocol routes — then make the allowlist entries `{ path, methods }`.
 app.on(["GET", "POST"], "/api/auth/*", (c, next) => {
-  if ((BETTER_AUTH_ALLOWLIST as readonly string[]).includes(c.req.path)) {
+  const allowlisted = (BETTER_AUTH_ALLOWLIST as readonly string[]).includes(
+    c.req.path,
+  );
+  if (allowlisted && c.req.method !== "GET") return next();
+  if (allowlisted) {
     return auth.handler(c.req.raw);
   }
   return next();
