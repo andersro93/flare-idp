@@ -119,14 +119,18 @@ app.doc31("/api/openapi.json", {
 });
 
 // `@scalar/hono-api-reference`'s `Scalar()` helper injects the browser
-// bundle as a plain `<script src="...">` (no `type="module"`) — see
-// `getScriptTags` in `@scalar/client-side-rendering`. The vendored bundle
-// (`standalone.esm.js`) is an ES module and errors as a classic script, so
-// this hand-renders the docs page instead, importing it as a module
-// directly.
+// bundle as a plain `<script src="...">` (no `type="module"`) — see its
+// `getScriptTags` helper (`@scalar/client-side-rendering`). The vendored
+// bundle (`standalone.esm.js`) is an ES module and errors as a classic
+// script, so this hand-renders the docs page instead. The bootstrap that
+// calls `createApiReference` lives in its own vendored, same-origin file
+// (`/vendor/scalar/bootstrap.js`, written by `apps/idp/scripts/vendor-scalar.ts`)
+// referenced via an external `<script src>` — NOT inlined here — because our
+// strict `script-src 'self'` CSP (relaxed only for `style-src` on this
+// route) blocks inline script bodies outright.
 app.get("/api/docs", (c) =>
   c.html(
-    `<!doctype html><html><head><title>flare-idp API</title><meta charset="utf-8"/><meta name="viewport" content="width=device-width, initial-scale=1"/></head><body><div id="app"></div><script type="module">import { createApiReference } from "/vendor/scalar/standalone.esm.js"; createApiReference("#app", { url: "/api/openapi.json" });</script></body></html>`,
+    `<!doctype html><html><head><title>flare-idp API</title><meta charset="utf-8"/><meta name="viewport" content="width=device-width, initial-scale=1"/></head><body><div id="app"></div><script type="module" src="/vendor/scalar/bootstrap.js"></script></body></html>`,
   ),
 );
 

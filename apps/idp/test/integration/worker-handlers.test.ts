@@ -36,8 +36,9 @@ describe("worker handlers", () => {
       { id: "m2", timestamp: new Date(), body: { kind: "spike" }, attempts: 1 },
     ]);
     const ctx = createExecutionContext();
-    // worker.ts declares queue as `(batch, env) => handleQueue(batch, env)`; `satisfies
-    // ExportedHandler<Env>` keeps that narrower 2-arg inferred type, so only 2 args here.
+    // worker.ts declares queue as `(batch, env) => handleQueue(batch as MessageBatch<EmailJob>, env)`;
+    // `satisfies ExportedHandler<Env>` keeps the outer arrow's inferred
+    // (contextual, `MessageBatch<unknown>`) parameter types, so only 2 args here.
     await worker.queue?.(batch, env);
     const result = await getQueueResult(batch, ctx);
     expect(result.explicitAcks).toEqual(["m1", "m2"]);

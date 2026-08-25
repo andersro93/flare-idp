@@ -27,6 +27,13 @@ describe("Better-Auth allowlist", () => {
     ["POST", "/api/auth/sign-up/email"],
     ["GET", "/api/auth/get-session"],
     ["GET", "/api/auth/admin/list-users"],
+    // Only exact-path GET/POST to /api/auth/jwks is allowlisted — other
+    // methods to that same path, and other methods to any other
+    // /api/auth/* path, must never reach `auth.handler` either.
+    ["PUT", "/api/auth/jwks"],
+    ["DELETE", "/api/auth/jwks"],
+    ["PATCH", "/api/auth/jwks"],
+    ["PUT", "/api/auth/sign-in/email"],
   ])(
     "%s %s (not allowlisted) returns the 404 envelope",
     async (method, path) => {

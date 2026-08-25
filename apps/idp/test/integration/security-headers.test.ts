@@ -30,6 +30,19 @@ describe("security headers", () => {
     expect(csp).not.toContain("script-src 'self' 'unsafe-inline'");
   });
 
+  it("/api/docs has no inline <script> body — every script tag loads from a src= (required under script-src 'self')", async () => {
+    const res = await SELF.fetch("http://localhost/api/docs");
+    const html = await res.text();
+    const scriptTags = html.match(/<script\b[^>]*>[\s\S]*?<\/script>/gi) ?? [];
+    expect(scriptTags.length).toBeGreaterThan(0);
+    for (const tag of scriptTags) {
+      const openTag = tag.slice(0, tag.indexOf(">") + 1);
+      expect(openTag).toMatch(/\ssrc=/);
+      const body = tag.slice(tag.indexOf(">") + 1, tag.lastIndexOf("<"));
+      expect(body.trim()).toBe("");
+    }
+  });
+
   it("an unknown /api/* path returns the 404 envelope", async () => {
     const res = await SELF.fetch("http://localhost/api/x");
     expect(res.status).toBe(404);
