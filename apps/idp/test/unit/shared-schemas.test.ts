@@ -1,13 +1,19 @@
 import {
   ERROR_CODES,
   emailSchema,
+  emailVerifySchema,
   errorBodySchema,
   nameSchema,
+  passwordChangeSchema,
+  passwordForgotSchema,
+  passwordResetSchema,
   passwordSchema,
   profilePatchSchema,
   ROLES,
+  sessionInfoSchema,
   sessionUserSchema,
   setupCompleteSchema,
+  signInSchema,
 } from "@flare-idp/shared";
 import { describe, expect, it } from "vitest";
 
@@ -105,7 +111,7 @@ describe("shared schemas", () => {
       expect(() => passwordSchema.parse("a".repeat(129))).toThrow();
     });
 
-    it("accepts empty password if length check passes (not empty)", () => {
+    it("rejects an empty password", () => {
       expect(() => passwordSchema.parse("")).toThrow();
     });
   });
@@ -222,10 +228,6 @@ describe("shared schemas", () => {
       expect(() => profilePatchSchema.parse({})).toThrow();
     });
 
-    it("rejects patches with only optional fields missing values", () => {
-      expect(() => profilePatchSchema.parse({})).toThrow();
-    });
-
     it("processes name through nameSchema (trimming)", () => {
       const result = profilePatchSchema.parse({ name: "  John Doe  " });
       expect(result.name).toBe("John Doe");
@@ -323,6 +325,261 @@ describe("shared schemas", () => {
           // missing name and emailVerified
           role: "user",
           createdAt: new Date("2024-01-01"),
+        }),
+      ).toThrow();
+    });
+  });
+
+  describe("signInSchema", () => {
+    it("parses a valid sign-in request", () => {
+      const result = signInSchema.parse({
+        email: "user@example.com",
+        password: "correct-horse-battery-staple",
+      });
+      expect(result).toEqual({
+        email: "user@example.com",
+        password: "correct-horse-battery-staple",
+      });
+    });
+
+    it("transforms email through emailSchema (trimming and lowercasing)", () => {
+      const result = signInSchema.parse({
+        email: "  USER@EXAMPLE.COM  ",
+        password: "correct-horse-battery-staple",
+      });
+      expect(result.email).toBe("user@example.com");
+    });
+
+    it("rejects an empty password", () => {
+      expect(() =>
+        signInSchema.parse({
+          email: "user@example.com",
+          password: "",
+        }),
+      ).toThrow();
+    });
+
+    it("rejects an invalid email", () => {
+      expect(() =>
+        signInSchema.parse({
+          email: "not-an-email",
+          password: "correct-horse-battery-staple",
+        }),
+      ).toThrow();
+    });
+  });
+
+  describe("passwordForgotSchema", () => {
+    it("parses a valid password forgot request", () => {
+      const result = passwordForgotSchema.parse({
+        email: "user@example.com",
+      });
+      expect(result).toEqual({ email: "user@example.com" });
+    });
+
+    it("transforms email through emailSchema (trimming and lowercasing)", () => {
+      const result = passwordForgotSchema.parse({
+        email: "  USER@EXAMPLE.COM  ",
+      });
+      expect(result.email).toBe("user@example.com");
+    });
+
+    it("rejects an invalid email", () => {
+      expect(() =>
+        passwordForgotSchema.parse({
+          email: "not-an-email",
+        }),
+      ).toThrow();
+    });
+  });
+
+  describe("passwordResetSchema", () => {
+    it("parses a valid password reset request", () => {
+      const result = passwordResetSchema.parse({
+        token: "reset-token-123",
+        password: "correct-horse-battery-staple",
+      });
+      expect(result).toEqual({
+        token: "reset-token-123",
+        password: "correct-horse-battery-staple",
+      });
+    });
+
+    it("rejects an empty token", () => {
+      expect(() =>
+        passwordResetSchema.parse({
+          token: "",
+          password: "correct-horse-battery-staple",
+        }),
+      ).toThrow();
+    });
+
+    it("rejects a password shorter than 12 characters", () => {
+      expect(() =>
+        passwordResetSchema.parse({
+          token: "reset-token-123",
+          password: "short",
+        }),
+      ).toThrow();
+    });
+  });
+
+  describe("passwordChangeSchema", () => {
+    it("parses a valid password change request with all fields", () => {
+      const result = passwordChangeSchema.parse({
+        currentPassword: "old-password-string",
+        newPassword: "correct-horse-battery-staple",
+        revokeOtherSessions: true,
+      });
+      expect(result).toEqual({
+        currentPassword: "old-password-string",
+        newPassword: "correct-horse-battery-staple",
+        revokeOtherSessions: true,
+      });
+    });
+
+    it("defaults revokeOtherSessions to true when omitted", () => {
+      const result = passwordChangeSchema.parse({
+        currentPassword: "old-password-string",
+        newPassword: "correct-horse-battery-staple",
+      });
+      expect(result.revokeOtherSessions).toBe(true);
+    });
+
+    it("preserves an explicit false for revokeOtherSessions", () => {
+      const result = passwordChangeSchema.parse({
+        currentPassword: "old-password-string",
+        newPassword: "correct-horse-battery-staple",
+        revokeOtherSessions: false,
+      });
+      expect(result.revokeOtherSessions).toBe(false);
+    });
+
+    it("rejects a newPassword shorter than 12 characters", () => {
+      expect(() =>
+        passwordChangeSchema.parse({
+          currentPassword: "old-password-string",
+          newPassword: "short",
+        }),
+      ).toThrow();
+    });
+
+    it("rejects an empty currentPassword", () => {
+      expect(() =>
+        passwordChangeSchema.parse({
+          currentPassword: "",
+          newPassword: "correct-horse-battery-staple",
+        }),
+      ).toThrow();
+    });
+  });
+
+  describe("emailVerifySchema", () => {
+    it("parses a valid email verify request", () => {
+      const result = emailVerifySchema.parse({
+        token: "verify-token-123",
+      });
+      expect(result).toEqual({ token: "verify-token-123" });
+    });
+
+    it("rejects an empty token", () => {
+      expect(() =>
+        emailVerifySchema.parse({
+          token: "",
+        }),
+      ).toThrow();
+    });
+  });
+
+  describe("sessionInfoSchema", () => {
+    it("parses a valid session info with all fields", () => {
+      const result = sessionInfoSchema.parse({
+        id: "session-123",
+        createdAt: new Date("2024-01-01"),
+        expiresAt: new Date("2024-01-15"),
+        userAgent: "Mozilla/5.0",
+        ipAddress: "192.168.1.1",
+        current: true,
+      });
+      expect(result).toMatchObject({
+        id: "session-123",
+        userAgent: "Mozilla/5.0",
+        ipAddress: "192.168.1.1",
+        current: true,
+      });
+      expect(result.createdAt).toEqual(new Date("2024-01-01"));
+      expect(result.expiresAt).toEqual(new Date("2024-01-15"));
+    });
+
+    it("coerces string dates to Date objects", () => {
+      const result = sessionInfoSchema.parse({
+        id: "session-123",
+        createdAt: "2024-01-01T00:00:00Z",
+        expiresAt: "2024-01-15T00:00:00Z",
+        current: false,
+      });
+      expect(result.createdAt).toBeInstanceOf(Date);
+      expect(result.expiresAt).toBeInstanceOf(Date);
+    });
+
+    it("accepts userAgent as null", () => {
+      const result = sessionInfoSchema.parse({
+        id: "session-123",
+        createdAt: new Date("2024-01-01"),
+        expiresAt: new Date("2024-01-15"),
+        userAgent: null,
+        current: true,
+      });
+      expect(result.userAgent).toBeNull();
+    });
+
+    it("accepts ipAddress as null", () => {
+      const result = sessionInfoSchema.parse({
+        id: "session-123",
+        createdAt: new Date("2024-01-01"),
+        expiresAt: new Date("2024-01-15"),
+        ipAddress: null,
+        current: true,
+      });
+      expect(result.ipAddress).toBeNull();
+    });
+
+    it("handles userAgent as optional (absent)", () => {
+      const result = sessionInfoSchema.parse({
+        id: "session-123",
+        createdAt: new Date("2024-01-01"),
+        expiresAt: new Date("2024-01-15"),
+        current: false,
+      });
+      expect(result.userAgent).toBeUndefined();
+    });
+
+    it("handles ipAddress as optional (absent)", () => {
+      const result = sessionInfoSchema.parse({
+        id: "session-123",
+        createdAt: new Date("2024-01-01"),
+        expiresAt: new Date("2024-01-15"),
+        current: true,
+      });
+      expect(result.ipAddress).toBeUndefined();
+    });
+
+    it("rejects missing required current field", () => {
+      expect(() =>
+        sessionInfoSchema.parse({
+          id: "session-123",
+          createdAt: new Date("2024-01-01"),
+          expiresAt: new Date("2024-01-15"),
+        }),
+      ).toThrow();
+    });
+
+    it("rejects missing required id field", () => {
+      expect(() =>
+        sessionInfoSchema.parse({
+          createdAt: new Date("2024-01-01"),
+          expiresAt: new Date("2024-01-15"),
+          current: true,
         }),
       ).toThrow();
     });
