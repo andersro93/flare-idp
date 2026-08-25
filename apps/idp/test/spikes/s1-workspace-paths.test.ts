@@ -13,9 +13,7 @@ describe("S1 workspace path resolution", () => {
   });
 
   it("loaded migrations from packages/db/migrations", async () => {
-    expect(env.TEST_MIGRATIONS.map((m) => m.name)).toEqual([
-      "0001_app_installation.sql",
-    ]);
+    expect(env.TEST_MIGRATIONS.map((m) => m.name)).toEqual(["0000_init.sql"]);
     const tables = await env.DB.prepare(
       "SELECT name FROM sqlite_master WHERE type = 'table' AND name = 'app_installation'",
     ).all();

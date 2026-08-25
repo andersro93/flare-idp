@@ -1,2 +1,5 @@
-/** Drizzle schema, client and repositories are added in Phase 1. */
-export const MIGRATIONS_DIR = "packages/db/migrations" as const;
+export type { AppDatabase } from "./client";
+export { dbFor, schema } from "./client";
+export * from "./repositories/audit";
+export * from "./repositories/installation";
+export * from "./repositories/settings";

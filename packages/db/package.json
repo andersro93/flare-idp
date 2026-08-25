@@ -5,5 +5,17 @@
   "type": "module",
   "exports": {
     ".": "./src/index.ts"
+  },
+  "scripts": {
+    "generate": "drizzle-kit generate",
+    "generate:auth": "bun x auth@1.7.1 generate --config gen/betterauth-schema.config.ts --output src/schema/auth.ts -y"
+  },
+  "dependencies": {
+    "drizzle-orm": "0.45.2"
+  },
+  "devDependencies": {
+    "@better-auth/drizzle-adapter": "1.7.1",
+    "better-auth": "1.7.1",
+    "drizzle-kit": "0.31.10"
   }
 }

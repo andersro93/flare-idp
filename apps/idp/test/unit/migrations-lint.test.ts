@@ -7,8 +7,9 @@ const migrationsDir = new URL(
 );
 
 describe("D1 migration files", () => {
-  const files = readdirSync(migrationsDir)
-    .filter((name) => name.endsWith(".sql"))
+  const files = readdirSync(migrationsDir, { withFileTypes: true })
+    .filter((entry) => entry.isFile() && entry.name.endsWith(".sql"))
+    .map((entry) => entry.name)
     .sort();
 
   it("exist and follow NNNN_name.sql", () => {
@@ -16,9 +17,9 @@ describe("D1 migration files", () => {
     for (const name of files) expect(name).toMatch(/^\d{4}_[a-z0-9_]+\.sql$/);
   });
 
-  it("are numbered sequentially from 0001 without gaps or duplicates", () => {
+  it("are numbered sequentially from 0000 without gaps or duplicates", () => {
     const numbers = files.map((name) => Number(name.slice(0, 4)));
-    expect(numbers[0]).toBe(1);
+    expect(numbers[0]).toBe(0);
     for (let i = 1; i < numbers.length; i += 1) {
       expect(numbers[i], `after ${numbers[i - 1]}`).toBe(
         (numbers[i - 1] ?? 0) + 1,
