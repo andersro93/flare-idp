@@ -26,6 +26,29 @@ describe("mapAuthError", () => {
     );
   });
 
+  it("maps UNPROCESSABLE_ENTITY and CONFLICT to a 400 invalid_request, forwarding the upstream message", () => {
+    expect(
+      mapAuthError(
+        new APIError("UNPROCESSABLE_ENTITY", {
+          message: "User already exists",
+        }),
+      ),
+    ).toEqual(
+      expect.objectContaining({
+        code: "invalid_request",
+        status: 400,
+        message: "User already exists",
+      }),
+    );
+    expect(mapAuthError(new APIError("CONFLICT", { message: "dup" }))).toEqual(
+      expect.objectContaining({
+        code: "invalid_request",
+        status: 400,
+        message: "dup",
+      }),
+    );
+  });
+
   it("maps INTERNAL_SERVER_ERROR to a generic 500 without leaking the upstream message", () => {
     expect(
       mapAuthError(
@@ -41,7 +64,9 @@ describe("mapAuthError", () => {
   });
 
   it("defaults unmapped statuses to a generic 500 without leaking the upstream message", () => {
-    expect(mapAuthError(new APIError("CONFLICT", { message: "dup" }))).toEqual(
+    expect(
+      mapAuthError(new APIError("SERVICE_UNAVAILABLE", { message: "down" })),
+    ).toEqual(
       expect.objectContaining({
         code: "internal",
         status: 500,

@@ -34,6 +34,12 @@ export function mapAuthError(error: unknown): unknown {
       return new AppError(429, "rate_limited", message);
     case "BAD_REQUEST":
       return new AppError(400, "invalid_request", message);
+    case "UNPROCESSABLE_ENTITY":
+    case "CONFLICT":
+      // Genuine 4xx client errors from Better-Auth (e.g. "User already
+      // exists") — the upstream message is user-actionable here, unlike the
+      // 500 case below.
+      return new AppError(400, "invalid_request", message);
     case "INTERNAL_SERVER_ERROR":
       // Never forward Better-Auth's internal message to the caller.
       return new AppError(500, "internal", "Internal error");
