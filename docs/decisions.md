@@ -299,3 +299,75 @@ fact below is a measured result from those spikes, not a projection.
   meaningfully more code (Drizzle schema, env validation, secure headers, rate limiter, OpenAPI/
   Scalar) and should re-measure with `apps/idp/scripts/check-startup.sh` before assuming the
   budget still holds.
+
+## Phase 1 addendum (2026-08-25)
+
+Facts recorded at Phase 1 close-out (Task 10), against the same tool versions listed at the top of
+this file plus `@hono/zod-openapi` 1.6.1, `@scalar/hono-api-reference` 0.11.16,
+`@better-auth/drizzle-adapter` 1.7.1.
+
+**(a) Issuer decision taken.** Option 1 from the Phase 0 recommendation shipped as-is:
+`packages/api/src/auth/auth.ts` configures
+`jwt({ jwt: { issuer: env.APP_URL }, jwks: { keyPairConfig: { alg: "EdDSA", crv: "Ed25519" } } })`,
+so the OIDC issuer is the bare origin (`APP_URL`) while every Better-Auth protocol route stays
+mounted under `/api/auth`. The root-level rewrite for the key set is live —
+`GET /.well-known/jwks.json` rewrites the request path to `/api/auth/jwks` and re-invokes
+`auth.handler` (`packages/api/src/http/app.ts`). The rest of OIDC discovery
+(`/.well-known/openid-configuration`, `/.well-known/oauth-authorization-server`) is deferred to
+Phase 2, by spec — those paths don't exist on the Better-Auth side until the `oauthProvider`
+plugin is installed, so there is nothing to rewrite to yet.
+
+**(b) `BETTER_AUTH_ALLOWLIST` as shipped.** `["/api/auth/jwks"] as const`
+(`packages/api/src/http/app.ts`). Every other `/api/auth/*` path (any method, including other
+methods to `/api/auth/jwks` itself) falls through to the `/api/*` 404 envelope; growing this list
+is a conscious diff, contract-tested in `apps/idp/test/integration/allowlist.test.ts`.
+
+**(c) Session revocation semantics.** `packages/api/src/auth/auth.ts`'s `session` config carries no
+`cookieCache` block, and `loadSession` (`packages/api/src/http/middleware/session.ts`) always calls
+`auth.api.getSession` with `query: { disableCookieCache: true }`. Together this means every
+authenticated request re-reads the session from Better-Auth's KV-backed secondary storage (falling
+through to D1 on a KV miss) rather than trusting a signed cookie — a revoked/signed-out session
+stops authenticating on the very next request that reaches this Worker instance. Caveat: Workers KV
+is eventually consistent across Cloudflare PoPs (propagation up to ~60s), so revocation is
+near-immediate rather than strictly immediate for a request that lands on a different PoP than the
+one that performed the revoking write; within a single PoP (the common case for a given client) it
+is effectively immediate.
+
+**(d) Setup bootstrap: raw role promotion requires KV session invalidation.** `POST
+/api/setup/complete` (`packages/api/src/routes/setup.ts`) creates the bootstrap admin via
+`auth.api.signUpEmail`, then promotes the row with a raw Drizzle `UPDATE user SET role = 'admin'`
+(bypassing Better-Auth's own session-mirroring). Because `signUpEmail` already mirrored the
+pre-promotion `{ session, user }` snapshot into KV keyed by the raw session token, the route
+explicitly `c.env.KV.delete(result.token)`s that entry right after the promotion so the very next
+`findSession` for that token falls through to D1 (which has the "admin" row) instead of serving the
+stale cached "user" role. This is implemented and regression-tested:
+`apps/idp/test/integration/setup-route.test.ts`, "the just-created admin's own session immediately
+reports role admin (no stale KV cache)".
+
+**(e) Phase 1 startup re-measure** (`bun run --cwd apps/idp check:startup`, 2026-08-25):
+
+| Metric              | Phase 0 baseline | Phase 1        | Budget                    | Status |
+| ------------------- | ----------------:| --------------:| -------------------------- | ------ |
+| Bundle, raw          | 2,630,348 bytes  | 1,678,418 bytes | —                          | —      |
+| Bundle, gzip          | 551,408 bytes    | 356,779 bytes   | < 3 MB (3,145,728 bytes)   | PASS   |
+| Startup CPU (active)  | 85.0 ms          | 95.0 ms         | target < 200 ms, limit 400 ms | PASS |
+
+Phase 1 added meaningfully more code (Drizzle schema/repositories, env validation, secure headers,
+D1 rate limiter, six route families, OpenAPI/Scalar docs) yet the shipped bundle is SMALLER than
+the Phase 0 baseline, both raw and gzip — Phase 1 also *removed* `@better-auth/oauth-provider` and
+`@better-auth/passkey` from `packages/api/package.json` (they return in Phases 2 and 5
+respectively), and that removal more than offsets everything Phase 1 added. Startup CPU rose by
+10 ms (85.0 → 95.0 ms) but remains well under half the 200 ms target and under a quarter of the
+400 ms platform limit. No mitigation required.
+
+**(f) Reset/verify token transport differs by route — SPA implication for Phase 3.** Better-Auth
+builds these URLs itself from the `redirectTo`/`callbackURL` this facade passes it
+(`packages/api/src/routes/password.ts`'s `POST /forgot` passes `redirectTo: "/reset-password"`;
+`packages/api/src/routes/email-verification.ts`'s `POST /resend` passes
+`callbackURL: "/verify-email"`), using Better-Auth's own per-flow URL shape:
+- Password reset: the token is a **path segment** — `/reset-password/<token>[?callbackURL=...]`.
+- Email verification: the token is a **query param** — `/verify-email?token=<token>[&callbackURL=...]`.
+
+The Phase 3 SPA's `/reset-password/:token` and `/verify-email` pages must parse the token
+accordingly (route param vs. `URLSearchParams`) — they are not interchangeable, and getting this
+wrong silently drops the token rather than erroring.

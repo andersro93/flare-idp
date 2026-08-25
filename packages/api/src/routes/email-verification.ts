@@ -12,14 +12,6 @@ import {
   rateLimit,
 } from "../http/security/rate-limit";
 
-export const emailVerificationRoutes = newRouter();
-
-// requireAuth/rateLimit are wired via their own `.use()` statements per
-// route, so the public `/verify` route stays unauthenticated while
-// `/resend` requires a session.
-emailVerificationRoutes.use("/verify", rateLimit(RATE_LIMITS.emailVerify));
-emailVerificationRoutes.use("/resend", requireAuth);
-
 function errorResponse(description: string) {
   return {
     description,
@@ -71,44 +63,6 @@ const verifyRoute = createRoute({
   },
 });
 
-emailVerificationRoutes.openapi(verifyRoute, async (c) => {
-  const body = c.req.valid("json");
-  const db = dbFor(c.env.DB);
-  const ip = clientAddress(c.req.raw.headers);
-  const varsUser = c.get("user");
-
-  let result: unknown;
-  try {
-    result = await callAuth(c, () =>
-      auth.api.verifyEmail({
-        query: { token: body.token },
-        headers: c.req.raw.headers,
-        returnHeaders: true,
-      }),
-    );
-  } catch (error) {
-    // Route-level semantic remap: any 4xx from verifyEmail (missing token,
-    // expired/consumed token, unknown token) reads as `invalid_token` to the
-    // caller, regardless of Better-Auth's underlying status.
-    if (error instanceof AppError && isClientError(error.status)) {
-      throw new AppError(
-        400,
-        "invalid_token",
-        "The verification token is invalid or expired.",
-      );
-    }
-    throw error;
-  }
-
-  await recordAuditEvent(db, {
-    event: "email.verified",
-    actorUserId: verifiedUserIdFrom(result) ?? varsUser?.id ?? null,
-    actorIp: ip,
-  });
-
-  return c.json({ ok: true as const }, 200);
-});
-
 const resendRoute = createRoute({
   method: "post",
   path: "/resend",
@@ -122,22 +76,86 @@ const resendRoute = createRoute({
   },
 });
 
-emailVerificationRoutes.openapi(resendRoute, async (c) => {
-  const user = c.get("user");
-  // requireAuth already guards this path; narrow for the type checker.
-  if (!user) {
-    throw new AppError(401, "unauthorized", "Authentication required");
-  }
+// `.openapi()` calls MUST be chained directly off `newRouter()`'s result
+// and the return captured — `OpenAPIHono#openapi()` returns a NEW,
+// more-refined-Schema type; calling it without capturing the return
+// leaves the ORIGINAL binding's static type unchanged (still
+// `Schema = {}`). That's harmless at runtime (the route is still
+// registered — `.openapi()` mutates in place too) but silently erases
+// this route file's contribution to `AppType`, which is what
+// `hc<AppType>` types itself from. See
+// `apps/idp/test/unit/hc-client.test.ts`.
+//
+// `.use()`, by contrast, must NOT be chained into that same expression:
+// its declared return type is the base `Hono`, not `OpenAPIHono` (a known
+// upstream typing gap — see `app-shared.ts`'s `newRouter()` docstring), so
+// chaining `.openapi()` after a `.use()` call is a type error. Calling
+// `.use()` as bare statements on `emailVerificationRoutesBase` sidesteps
+// that: the side effects (registering the middleware) still happen, in
+// the same order, before the `.openapi()` chain below runs its own
+// registration — only the STATIC TYPE of a captured return value would
+// have been wrong, and nothing captures it.
+const emailVerificationRoutesBase = newRouter();
+// requireAuth/rateLimit are wired via their own `.use()` statements per
+// route, so the public `/verify` route stays unauthenticated while
+// `/resend` requires a session.
+emailVerificationRoutesBase.use("/verify", rateLimit(RATE_LIMITS.emailVerify));
+emailVerificationRoutesBase.use("/resend", requireAuth);
 
-  try {
-    // No `returnHeaders`/`callAuth`: this call sets no cookies to forward.
-    await auth.api.sendVerificationEmail({
-      body: { email: user.email, callbackURL: "/verify-email" },
-      headers: c.req.raw.headers,
+export const emailVerificationRoutes = emailVerificationRoutesBase
+  .openapi(verifyRoute, async (c) => {
+    const body = c.req.valid("json");
+    const db = dbFor(c.env.DB);
+    const ip = clientAddress(c.req.raw.headers);
+    const varsUser = c.get("user");
+
+    let result: unknown;
+    try {
+      result = await callAuth(c, () =>
+        auth.api.verifyEmail({
+          query: { token: body.token },
+          headers: c.req.raw.headers,
+          returnHeaders: true,
+        }),
+      );
+    } catch (error) {
+      // Route-level semantic remap: any 4xx from verifyEmail (missing token,
+      // expired/consumed token, unknown token) reads as `invalid_token` to the
+      // caller, regardless of Better-Auth's underlying status.
+      if (error instanceof AppError && isClientError(error.status)) {
+        throw new AppError(
+          400,
+          "invalid_token",
+          "The verification token is invalid or expired.",
+        );
+      }
+      throw error;
+    }
+
+    await recordAuditEvent(db, {
+      event: "email.verified",
+      actorUserId: verifiedUserIdFrom(result) ?? varsUser?.id ?? null,
+      actorIp: ip,
     });
-  } catch (error) {
-    throw mapAuthError(error);
-  }
 
-  return c.json({ ok: true as const }, 200);
-});
+    return c.json({ ok: true as const }, 200);
+  })
+  .openapi(resendRoute, async (c) => {
+    const user = c.get("user");
+    // requireAuth already guards this path; narrow for the type checker.
+    if (!user) {
+      throw new AppError(401, "unauthorized", "Authentication required");
+    }
+
+    try {
+      // No `returnHeaders`/`callAuth`: this call sets no cookies to forward.
+      await auth.api.sendVerificationEmail({
+        body: { email: user.email, callbackURL: "/verify-email" },
+        headers: c.req.raw.headers,
+      });
+    } catch (error) {
+      throw mapAuthError(error);
+    }
+
+    return c.json({ ok: true as const }, 200);
+  });
