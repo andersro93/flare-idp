@@ -1,137 +1,27 @@
 import { SELF } from "cloudflare:test";
 import { errorBodySchema } from "@flare-idp/shared";
 import { beforeEach, describe, expect, it } from "vitest";
-import type { CookieJar } from "./helpers/cookies";
 import { resetDatabase } from "./helpers/db";
+import { api, TEST_ORIGIN } from "./helpers/http";
 import {
-  api,
-  completeSetup,
-  SETUP_ADMIN,
-  signIn,
-  TEST_ORIGIN,
-} from "./helpers/http";
+  authorize,
+  authorizeParams,
+  captureConsentQuery,
+  createOAuthClient as createClient,
+  pkce,
+  REDIRECT_URI,
+  setupAdmin,
+  tokenRequest,
+} from "./helpers/oauth";
 
 beforeEach(resetDatabase);
 
 const CONSENT = "/api/oauth/consent";
-const REDIRECT_URI = "https://rp.example.com/callback";
 
 type ConsentInfoBody = {
   client: { clientId: string; name?: string; logoUri?: string };
   scopes: Array<{ id: string; description: string }>;
 };
-
-/** Completes setup, drops the bootstrap session, signs back in fresh (see account-routes.test.ts). */
-async function setupAdmin(): Promise<CookieJar> {
-  const jar = await completeSetup();
-  await api("/api/session/sign-out", { method: "POST" }, jar);
-  const { jar: adminJar } = await signIn(
-    SETUP_ADMIN.email,
-    SETUP_ADMIN.password,
-  );
-  return adminJar;
-}
-
-/** Creates a confidential client through the Task 3 admin facade. */
-async function createClient(
-  jar: CookieJar,
-  overrides: Record<string, unknown> = {},
-): Promise<{ clientId: string; clientSecret: string }> {
-  const res = await api(
-    "/api/admin/oauth-clients",
-    {
-      method: "POST",
-      body: JSON.stringify({
-        name: "Consent Test RP",
-        redirectUris: [REDIRECT_URI],
-        tokenEndpointAuthMethod: "client_secret_basic",
-        grantTypes: ["authorization_code", "refresh_token"],
-        scope: ["openid", "profile"],
-        skipConsent: false,
-        ...overrides,
-      }),
-    },
-    jar,
-  );
-  if (res.status !== 201) {
-    throw new Error(`client create failed: ${res.status} ${await res.text()}`);
-  }
-  const body = (await res.json()) as {
-    client: { clientId: string };
-    clientSecret?: string;
-  };
-  return {
-    clientId: body.client.clientId,
-    clientSecret: body.clientSecret ?? "",
-  };
-}
-
-function base64url(bytes: Uint8Array): string {
-  return btoa(String.fromCharCode(...bytes))
-    .replace(/\+/g, "-")
-    .replace(/\//g, "_")
-    .replace(/=+$/, "");
-}
-
-/** RFC 7636 S256 verifier/challenge pair. */
-async function pkce(): Promise<{ verifier: string; challenge: string }> {
-  const random = new Uint8Array(32);
-  crypto.getRandomValues(random);
-  const verifier = base64url(random);
-  const digest = await crypto.subtle.digest(
-    "SHA-256",
-    new TextEncoder().encode(verifier),
-  );
-  return { verifier, challenge: base64url(new Uint8Array(digest)) };
-}
-
-/**
- * GET /api/auth/oauth2/authorize as a browser navigation (accept: text/html,
- * no sec-fetch-mode) so Better-Auth answers with a real 302 rather than the
- * `{ redirect, url }` JSON it produces for fetch-style requests.
- */
-async function authorize(
-  jar: CookieJar,
-  params: Record<string, string>,
-): Promise<Response> {
-  const search = new URLSearchParams(params);
-  return SELF.fetch(`${TEST_ORIGIN}/api/auth/oauth2/authorize?${search}`, {
-    redirect: "manual",
-    headers: { cookie: jar.header(), accept: "text/html" },
-  });
-}
-
-function authorizeParams(
-  clientId: string,
-  challenge: string,
-  state: string,
-): Record<string, string> {
-  return {
-    response_type: "code",
-    client_id: clientId,
-    redirect_uri: REDIRECT_URI,
-    scope: "openid profile",
-    state,
-    code_challenge: challenge,
-    code_challenge_method: "S256",
-  };
-}
-
-/** Drives authorize up to the consent redirect and returns its query string. */
-async function captureConsentQuery(
-  jar: CookieJar,
-  clientId: string,
-  challenge: string,
-  state: string,
-): Promise<string> {
-  const res = await authorize(jar, authorizeParams(clientId, challenge, state));
-  expect(res.status).toBe(302);
-  const location = res.headers.get("location");
-  if (!location) throw new Error("authorize 302 had no Location header");
-  const url = new URL(location, TEST_ORIGIN);
-  expect(url.pathname).toBe("/oauth/consent");
-  return url.search;
-}
 
 describe("GET /api/oauth/consent", () => {
   it("requires authentication (401)", async () => {
@@ -143,7 +33,9 @@ describe("GET /api/oauth/consent", () => {
 
   it("returns the client's public info plus descriptions for the requested scopes, filtering unknown ones", async () => {
     const adminJar = await setupAdmin();
-    const { clientId } = await createClient(adminJar);
+    const { clientId } = await createClient(adminJar, {
+      name: "Consent Test RP",
+    });
 
     const query = new URLSearchParams({
       client_id: clientId,
@@ -264,19 +156,15 @@ describe("POST /api/oauth/consent", () => {
 
     // 3. the RP exchanges the code at the token endpoint (form-encoded,
     // Basic auth) — server-to-server, no origin header needed (CSRF-exempt).
-    const tokenRes = await SELF.fetch(`${TEST_ORIGIN}/api/auth/oauth2/token`, {
-      method: "POST",
-      headers: {
-        "content-type": "application/x-www-form-urlencoded",
-        authorization: `Basic ${btoa(`${clientId}:${clientSecret}`)}`,
-      },
-      body: new URLSearchParams({
+    const tokenRes = await tokenRequest(
+      {
         grant_type: "authorization_code",
         code: code ?? "",
         redirect_uri: REDIRECT_URI,
         code_verifier: verifier,
-      }).toString(),
-    });
+      },
+      { clientId, clientSecret },
+    );
     expect(tokenRes.status).toBe(200);
     const tokens = (await tokenRes.json()) as {
       access_token?: string;
@@ -286,6 +174,39 @@ describe("POST /api/oauth/consent", () => {
     expect(tokens.access_token).toBeTruthy();
     expect(tokens.id_token).toBeTruthy();
     expect((tokens.token_type ?? "").toLowerCase()).toBe("bearer");
+  });
+
+  it("rejects consenting to a scope not in the original authorize request (400 invalid_request)", async () => {
+    const adminJar = await setupAdmin();
+    const { clientId } = await createClient(adminJar);
+    const { challenge } = await pkce();
+
+    // The authorize request asked for "openid profile" only
+    // (authorizeParams); consenting to "email" on top must be refused by the
+    // plugin ("Scope not originally requested") and surface as our 400
+    // invalid_request envelope.
+    const oauthQuery = await captureConsentQuery(
+      adminJar,
+      clientId,
+      challenge,
+      "scope-escalation-1",
+    );
+
+    const res = await api(
+      CONSENT,
+      {
+        method: "POST",
+        body: JSON.stringify({
+          accept: true,
+          scope: ["openid", "profile", "email"],
+          oauthQuery,
+        }),
+      },
+      adminJar,
+    );
+    expect(res.status).toBe(400);
+    const body = errorBodySchema.parse(await res.json());
+    expect(body.error.code).toBe("invalid_request");
   });
 
   it("returns a redirectTo carrying error=access_denied when the user denies", async () => {

@@ -129,6 +129,9 @@ export const oauthConsentRoutes = oauthConsentRoutesBase
     // application/json` makes both the deny short-circuit and the
     // re-invoked authorize respond with `{ redirect: true, url }` JSON
     // instead of a 302.
+    // NOTE: `oauth_query` is a signed bearer artifact (HMAC sig + exp; not
+    // session-bound; resubmittable within its expiry) — plugin-inherent and
+    // accepted; cross-site misuse is blocked by our CSRF origin guard.
     const target = new URL(c.req.url);
     target.pathname = "/api/auth/oauth2/consent";
     target.search = "";
