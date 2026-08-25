@@ -1,6 +1,20 @@
 import { z } from "zod";
 import { ROLES } from "./roles";
 
+export const OAUTH_SCOPES = [
+  "openid",
+  "profile",
+  "email",
+  "offline_access",
+] as const;
+export type OAuthScope = (typeof OAUTH_SCOPES)[number];
+export const SCOPE_DESCRIPTIONS: Record<OAuthScope, string> = {
+  openid: "Sign you in and identify you",
+  profile: "Read your name and profile picture",
+  email: "Read your email address",
+  offline_access: "Stay signed in (refresh tokens)",
+};
+
 export const emailSchema = z.string().trim().toLowerCase().pipe(z.email());
 
 export const passwordSchema = z.string().min(12).max(128);

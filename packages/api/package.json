@@ -9,6 +9,7 @@
   "dependencies": {
     "@better-auth/core": "1.7.1",
     "@better-auth/drizzle-adapter": "1.7.1",
+    "@better-auth/oauth-provider": "1.7.1",
     "@flare-idp/db": "workspace:*",
     "@flare-idp/email": "workspace:*",
     "@flare-idp/shared": "workspace:*",

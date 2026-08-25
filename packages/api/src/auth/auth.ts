@@ -2,8 +2,10 @@
 // `packages/db/gen/betterauth-schema.config.ts` (schema-generation-only
 // config for `bun x auth generate`) — a comment in both files says so.
 import { drizzleAdapter } from "@better-auth/drizzle-adapter";
+import { oauthProvider } from "@better-auth/oauth-provider";
 import { dbFor, schema } from "@flare-idp/db";
 import { type EmailSender, queueEmailSender } from "@flare-idp/email";
+import { OAUTH_SCOPES } from "@flare-idp/shared";
 import { betterAuth } from "better-auth/minimal";
 import { admin, jwt } from "better-auth/plugins";
 import { kvSecondaryStorage } from "../kv-secondary-storage";
@@ -81,6 +83,21 @@ export function createAuth(
       jwt({
         jwt: { issuer: env.APP_URL },
         jwks: { keyPairConfig: { alg: "EdDSA", crv: "Ed25519" } },
+      }),
+      // Client CRUD happens only through our requireAdmin facade
+      // (clientPrivileges intentionally unset); the plugin's own client
+      // endpoints stay OFF the allowlist.
+      oauthProvider({
+        loginPage: "/sign-in",
+        consentPage: "/oauth/consent",
+        scopes: [...OAUTH_SCOPES],
+        storeClientSecret: "hashed",
+        customIdTokenClaims: ({ user }) => ({
+          role: (user as { role?: string }).role ?? "user",
+        }),
+        customUserInfoClaims: ({ user }) => ({
+          role: (user as { role?: string }).role ?? "user",
+        }),
       }),
     ],
   });

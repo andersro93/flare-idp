@@ -7,15 +7,18 @@ export { ERROR_CODES, errorBodySchema } from "./errors";
 export type { Role } from "./roles";
 export { ROLES } from "./roles";
 
+export type { OAuthScope } from "./schemas";
 export {
   emailSchema,
   emailVerifySchema,
   nameSchema,
+  OAUTH_SCOPES,
   passwordChangeSchema,
   passwordForgotSchema,
   passwordResetSchema,
   passwordSchema,
   profilePatchSchema,
+  SCOPE_DESCRIPTIONS,
   sessionInfoSchema,
   sessionUserSchema,
   setupCompleteSchema,
