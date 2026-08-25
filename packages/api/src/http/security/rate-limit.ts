@@ -103,6 +103,7 @@ export const RATE_LIMITS = {
   emailVerify: { name: "email-verify", windowSeconds: 300, max: 10 },
   passwordChange: { name: "pw-change", windowSeconds: 300, max: 5 },
   emailResend: { name: "email-resend", windowSeconds: 600, max: 3 },
+  oauthToken: { name: "oauth-token", windowSeconds: 60, max: 30 },
 } as const;
 
 /**

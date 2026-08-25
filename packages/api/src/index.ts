@@ -7,6 +7,7 @@ export {
   app,
   auth,
   BETTER_AUTH_ALLOWLIST,
+  CSRF_EXEMPT_PATHS,
 } from "./http/app";
 export {
   assertValidEnv,

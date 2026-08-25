@@ -4,8 +4,23 @@ import { errorBodySchema } from "@flare-idp/shared";
 import { describe, expect, it } from "vitest";
 
 describe("Better-Auth allowlist", () => {
-  it("is exactly the Phase 1 allowlist (growth is a conscious diff)", () => {
-    expect(BETTER_AUTH_ALLOWLIST).toEqual(["/api/auth/jwks"]);
+  it("is exactly the Phase 2 allowlist (growth is a conscious diff)", () => {
+    expect(BETTER_AUTH_ALLOWLIST).toEqual([
+      { path: "/api/auth/jwks", methods: ["GET"] },
+      { path: "/api/auth/oauth2/authorize", methods: ["GET", "POST"] },
+      { path: "/api/auth/oauth2/token", methods: ["POST"] },
+      { path: "/api/auth/oauth2/userinfo", methods: ["GET", "POST"] },
+      { path: "/api/auth/oauth2/introspect", methods: ["POST"] },
+      { path: "/api/auth/oauth2/revoke", methods: ["POST"] },
+      {
+        path: "/api/auth/.well-known/openid-configuration",
+        methods: ["GET"],
+      },
+      {
+        path: "/api/auth/.well-known/oauth-authorization-server",
+        methods: ["GET"],
+      },
+    ]);
   });
 
   it("GET /api/auth/jwks returns the key set", async () => {
@@ -35,6 +50,9 @@ describe("Better-Auth allowlist", () => {
     ["PATCH", "/api/auth/jwks"],
     ["POST", "/api/auth/jwks"],
     ["PUT", "/api/auth/sign-in/email"],
+    // Method-aware allowlist entries reject the wrong method too.
+    ["GET", "/api/auth/oauth2/token"],
+    ["POST", "/api/auth/.well-known/openid-configuration"],
   ])(
     "%s %s (not allowlisted) returns the 404 envelope",
     async (method, path) => {
@@ -44,4 +62,18 @@ describe("Better-Auth allowlist", () => {
       expect(body.error.code).toBe("not_found");
     },
   );
+
+  it("POST /api/auth/oauth2/authorize (allowlisted method) is NOT our 404 envelope", async () => {
+    // Allowlisted → reaches Better-Auth, which will reject the garbage body
+    // with its own protocol error. Any status is acceptable here (it's not
+    // our route); what matters is that it never falls through to our
+    // `not_found` envelope.
+    const res = await SELF.fetch("http://localhost/api/auth/oauth2/authorize", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: "{}",
+    });
+    const text = await res.text();
+    expect(text).not.toContain('"code":"not_found"');
+  });
 });

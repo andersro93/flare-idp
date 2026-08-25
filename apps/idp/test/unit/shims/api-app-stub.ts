@@ -8,8 +8,9 @@
 // resolvable for the pure http/security modules the `unit` project tests.
 //
 // Exports every name `http/app.ts` exports: `app`, `auth`,
-// `BETTER_AUTH_ALLOWLIST` (values) and `AppType` (a type — erased at
-// runtime, nothing to stub).
+// `BETTER_AUTH_ALLOWLIST`, `CSRF_EXEMPT_PATHS` (values) and `AppType` (a
+// type — erased at runtime, nothing to stub).
 export const app = undefined as never;
 export const auth = undefined as never;
 export const BETTER_AUTH_ALLOWLIST = [] as never;
+export const CSRF_EXEMPT_PATHS = [] as never;
