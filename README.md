@@ -19,7 +19,7 @@ OpenID Connect / OAuth 2.1 · passkeys · TOTP 2FA · organizations & teams · o
 
 ---
 
-> **Status: early development.** The scaffold, tooling and the risk spikes are done and green (Phase 0). The identity features below are being built phase by phase — see the [roadmap](#roadmap). Do not deploy this as your IdP yet.
+> **Status: early development.** The auth core and the full OAuth 2.1 / OIDC provider (discovery, JWKS, code + PKCE, consent, refresh rotation, client credentials, introspection/revocation) are built and green through Phase 2, and the reference instance runs in production. There is no web UI yet (Phase 3) — see the [roadmap](#roadmap). Do not deploy this as your IdP yet.
 
 ## What it is
 
