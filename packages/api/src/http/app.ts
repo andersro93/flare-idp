@@ -11,6 +11,7 @@ import { accountRoutes } from "../routes/account";
 import { adminOauthClientRoutes } from "../routes/admin-oauth-clients";
 import { emailVerificationRoutes } from "../routes/email-verification";
 import { healthRoutes } from "../routes/health";
+import { oauthConsentRoutes } from "../routes/oauth-consent";
 import { passwordRoutes } from "../routes/password";
 import { sessionRoutes } from "../routes/session";
 import { setupRoutes } from "../routes/setup";
@@ -149,7 +150,8 @@ const routes = app
   .route("/api/auth/password", passwordRoutes)
   .route("/api/auth/email", emailVerificationRoutes)
   .route("/api/account", accountRoutes)
-  .route("/api/admin/oauth-clients", adminOauthClientRoutes);
+  .route("/api/admin/oauth-clients", adminOauthClientRoutes)
+  .route("/api/oauth/consent", oauthConsentRoutes);
 export type AppType = typeof routes;
 
 // Better-Auth's own HTTP handler is mounted for an ALLOWLIST of exact

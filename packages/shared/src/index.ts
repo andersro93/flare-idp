@@ -9,6 +9,8 @@ export { ROLES } from "./roles";
 
 export type { OAuthScope } from "./schemas";
 export {
+  consentInfoSchema,
+  consentPostSchema,
   emailSchema,
   emailVerifySchema,
   nameSchema,

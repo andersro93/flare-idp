@@ -28,6 +28,7 @@ const EXPECTED_PATHS = [
   "/api/auth/password/reset",
   "/api/health/live",
   "/api/health/ready",
+  "/api/oauth/consent",
   "/api/session",
   "/api/session/sign-in/password",
   "/api/session/sign-out",

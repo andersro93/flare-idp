@@ -112,6 +112,29 @@ export const oauthClientPatchSchema = z
   })
   .refine((v) => Object.keys(v).length > 0, "empty patch");
 
+// Consent decision body for POST /api/oauth/consent. `oauthQuery` is the
+// VERBATIM query string Better-Auth appended when redirecting the browser to
+// the consent page (it carries a signature + expiry the plugin verifies) —
+// camelCase here, proxied to Better-Auth as snake_case `oauth_query`. An
+// omitted `scope` accepts all originally requested scopes.
+export const consentPostSchema = z.object({
+  accept: z.boolean(),
+  scope: z.array(z.enum(OAUTH_SCOPES)).optional(),
+  oauthQuery: z.string().min(1),
+});
+
+// GET /api/oauth/consent response: what the consent screen renders.
+export const consentInfoSchema = z.object({
+  client: z.object({
+    clientId: z.string(),
+    name: z.string().optional(),
+    logoUri: z.string().optional(),
+  }),
+  scopes: z.array(
+    z.object({ id: z.enum(OAUTH_SCOPES), description: z.string() }),
+  ),
+});
+
 // camelCase DTO — never carries `clientSecret` (that's added only by the
 // create/rotate response wrappers in the route file, where the plaintext
 // secret is genuinely present).
