@@ -10,11 +10,14 @@ type OpenApiSpec = {
   paths: Record<string, Record<string, OpenApiOperation>>;
 };
 
-// The API surface as of the Phase 1 close-out. Growing (or shrinking) it is
+// The documented API surface: facade routes plus the hand-registered OIDC
+// protocol paths (Phase 2). Growing (or shrinking) it is
 // a conscious diff — if this assertion fails because you added/removed/
 // renamed a route, update this literal array in the same change, not as a
 // side effect of something else.
 const EXPECTED_PATHS = [
+  "/.well-known/jwks.json",
+  "/.well-known/openid-configuration",
   "/api/account/profile",
   "/api/account/sessions",
   "/api/account/sessions/{id}",
@@ -23,6 +26,11 @@ const EXPECTED_PATHS = [
   "/api/admin/oauth-clients/{clientId}/rotate-secret",
   "/api/auth/email/resend",
   "/api/auth/email/verify",
+  "/api/auth/oauth2/authorize",
+  "/api/auth/oauth2/introspect",
+  "/api/auth/oauth2/revoke",
+  "/api/auth/oauth2/token",
+  "/api/auth/oauth2/userinfo",
   "/api/auth/password/change",
   "/api/auth/password/forgot",
   "/api/auth/password/reset",
@@ -43,10 +51,17 @@ const EXPECTED_PATHS = [
 // `GET /api/health/ready` is NOT in this list — it documents a 503 for the
 // "misconfigured/unreachable" case. Adding an entry here is a conscious
 // diff: it should only ever be a read-only endpoint with no failure mode.
+// The two discovery documents qualify: unauthenticated, read-only, static
+// metadata straight from the identity core — no failure mode short of the
+// process being down. (`authorize` is NOT here even though it has no JSON
+// error for most failures: it documents its error-carrying 302, which the
+// non-2xx rule below counts.)
 const NO_ERROR_RESPONSE_OPERATIONS = new Set([
   "get /api/health/live",
   "get /api/setup/status",
   "get /api/session",
+  "get /.well-known/openid-configuration",
+  "get /.well-known/jwks.json",
 ]);
 
 async function fetchSpec(): Promise<OpenApiSpec> {
@@ -61,7 +76,7 @@ describe("GET /api/openapi.json", () => {
     expect(spec.openapi).toBe("3.1.0");
   });
 
-  it("documents exactly the Phase 1 API surface (sorted path snapshot)", async () => {
+  it("documents exactly the expected API surface (sorted path snapshot)", async () => {
     const spec = await fetchSpec();
     expect(Object.keys(spec.paths).sort()).toEqual(EXPECTED_PATHS);
   });

@@ -13,6 +13,7 @@
     "test:watch": "vitest",
     "db:apply:local": "wrangler d1 migrations apply flare-idp --local",
     "check:startup": "bash scripts/check-startup.sh",
+    "smoke:oidc": "bun scripts/oidc-smoke.ts",
     "vendor:scalar": "bun scripts/vendor-scalar.ts"
   },
   "dependencies": {

@@ -7,6 +7,7 @@ import type { MiddlewareHandler } from "hono";
 import { cors } from "hono/cors";
 import { secureHeaders } from "hono/secure-headers";
 import { createAuth } from "../auth/auth";
+import { registerOidcProtocolRoutes } from "../openapi/protocol-routes";
 import { accountRoutes } from "../routes/account";
 import { adminOauthClientRoutes } from "../routes/admin-oauth-clients";
 import { emailVerificationRoutes } from "../routes/email-verification";
@@ -231,6 +232,13 @@ app.get("/.well-known/openid-configuration", (c) =>
 app.get("/.well-known/oauth-authorization-server", (c) =>
   authServerConfigHandler(c.req.raw),
 );
+
+// The OIDC/OAuth protocol endpoints are served natively above (allowlist
+// mount + root `.well-known` handlers), not as `.openapi()` routes — so
+// their documentation is hand-registered into the zod-to-openapi registry
+// that `doc31` reads (at request time) when generating the document. They
+// are documentation only: NOT part of `AppType`.
+registerOidcProtocolRoutes(app.openAPIRegistry);
 
 app.doc31("/api/openapi.json", {
   openapi: "3.1.0",
