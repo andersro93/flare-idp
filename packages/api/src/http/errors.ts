@@ -27,8 +27,15 @@ function nearestCodeFor(status: number): ErrorCode {
 /**
  * Global onError: `AppError` -> its own envelope + status; a bare
  * `HTTPException` -> mapped to the nearest error code; anything else is an
- * unhandled programming error, logged (never with the raw client-facing
- * message) and answered as a generic 500 so internals never leak.
+ * unhandled programming error, logged and answered as a generic 500 so
+ * internals never leak — in EITHER direction: the response body never
+ * carries the error's message, and neither does the log line. Arbitrary
+ * `Error#message`s embed secrets (drizzle-orm's `DrizzleQueryError` message
+ * is literally the failed SQL plus every bound parameter — plaintext
+ * verification/reset tokens included), and `console.*` reaches Workers Logs
+ * in production. Only a non-identifying type descriptor is logged;
+ * `constructor.name` rather than `Error#name` because subclasses like
+ * `DrizzleQueryError` inherit the generic `"Error"` name.
  */
 export function handleApiError(err: unknown, c: Context): Response {
   if (err instanceof AppError) {
@@ -43,7 +50,8 @@ export function handleApiError(err: unknown, c: Context): Response {
   }
 
   logEvent("error", "unhandled_error", {
-    message: err instanceof Error ? err.message : String(err),
+    errorType:
+      err instanceof Error ? (err.constructor?.name ?? err.name) : typeof err,
     path: c.req.path,
     method: c.req.method,
   });

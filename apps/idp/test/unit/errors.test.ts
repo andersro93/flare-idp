@@ -1,7 +1,7 @@
 import { AppError, errorBody, handleApiError } from "@flare-idp/api";
 import { Hono } from "hono";
 import { HTTPException } from "hono/http-exception";
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 
 describe("errorBody", () => {
   it("builds the envelope shape", () => {
@@ -68,5 +68,35 @@ describe("handleApiError", () => {
       error: { code: "internal", message: "Internal error" },
     });
     expect(JSON.stringify(body)).not.toContain("hunter2");
+  });
+
+  it("logs only a type descriptor for unknown errors — never the raw message", async () => {
+    // Mirrors drizzle-orm's DrizzleQueryError: a plain Error subclass whose
+    // MESSAGE carries the failed SQL and every bound parameter (plaintext
+    // reset/verification tokens included) and whose inherited `name` is the
+    // generic "Error" — the log line must carry the constructor name and
+    // nothing of the message.
+    class DrizzleQueryErrorLike extends Error {}
+    const app = appWithError(
+      new DrizzleQueryErrorLike(
+        'Failed query: insert into "verification" ...\nparams: sentinel-plaintext-token',
+      ),
+    );
+
+    const spy = vi.spyOn(console, "error").mockImplementation(() => {});
+    try {
+      const res = await app.request("/boom");
+      expect(res.status).toBe(500);
+
+      const logged = spy.mock.calls
+        .map((call) => call.map(String).join(" "))
+        .join("\n");
+      expect(logged).toContain('"event":"unhandled_error"');
+      expect(logged).toContain('"errorType":"DrizzleQueryErrorLike"');
+      expect(logged).not.toContain("sentinel-plaintext-token");
+      expect(logged).not.toContain("Failed query");
+    } finally {
+      spy.mockRestore();
+    }
   });
 });
