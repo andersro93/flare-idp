@@ -123,6 +123,19 @@ setupRoutes.openapi(complete, async (c) => {
       .set({ role: "admin" })
       .where(eq(schema.user.id, result.user.id));
 
+    // `signUpEmail` already mirrored `{ session, user }` into KV
+    // (secondaryStorage) keyed by the raw session token, BEFORE the role
+    // UPDATE above ran — that snapshot still has the pre-promotion role
+    // (the admin plugin's `defaultRole`). The raw drizzle UPDATE bypasses
+    // Better-Auth's own session-mirroring, so nothing else invalidates it.
+    // Deleting the cached entry makes the next `findSession` for this token
+    // fall through to D1, which returns the now-"admin" row — otherwise the
+    // bootstrap admin's session would report role "user" until it re-logs
+    // in or the cache entry naturally expires.
+    if (result.token) {
+      await c.env.KV.delete(result.token);
+    }
+
     await completeInstallation(db, {
       userId: result.user.id,
       email: result.user.email,

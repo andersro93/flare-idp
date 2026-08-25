@@ -59,6 +59,30 @@ describe("POST /api/setup/complete", () => {
     expect(await status.json()).toEqual({ status: "complete" });
   });
 
+  it("the just-created admin's own session immediately reports role admin (no stale KV cache)", async () => {
+    // Regression test: signUpEmail mirrors {session, user} into KV keyed by
+    // the raw session token BEFORE the route's raw drizzle role -> "admin"
+    // UPDATE runs. Without invalidating that cached entry, GET /api/session
+    // (which reads through Better-Auth's findSession -> secondaryStorage
+    // first) would keep answering the stale pre-promotion role ("user")
+    // for the entire session lifetime.
+    const jar = new CookieJar();
+    const res = await api(
+      "/api/setup/complete",
+      { method: "POST", body: completeBody() },
+      jar,
+    );
+    expect(res.status).toBe(201);
+
+    const sessionRes = await api("/api/session", {}, jar);
+    expect(sessionRes.status).toBe(200);
+    const sessionBody = (await sessionRes.json()) as {
+      user: { email: string; role: string } | null;
+    };
+    expect(sessionBody.user?.email).toBe(SETUP_ADMIN.email);
+    expect(sessionBody.user?.role).toBe("admin");
+  });
+
   it("rejects the wrong secret (403) without an audit row, and leaves status pending", async () => {
     const res = await api("/api/setup/complete", {
       method: "POST",
