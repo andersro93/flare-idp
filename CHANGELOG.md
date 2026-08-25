@@ -5,6 +5,49 @@ All notable changes to this project are documented in this file. It is generated
 [Conventional Commits](https://www.conventionalcommits.org); versions follow
 [Semantic Versioning](https://semver.org).
 
+## [0.2.0](https://github.com/andersro93/flare-idp/compare/v0.1.0...v0.2.0) (2026-08-25)
+
+
+### Features
+
+* add production environment and continuous deployment to idp.ros-nett.com ([f3213e8](https://github.com/andersro93/flare-idp/commit/f3213e865390b83688c79513368472d11fb8850f))
+* **api:** account profile and session management endpoints ([f28b652](https://github.com/andersro93/flare-idp/commit/f28b652d5690b011f60835e06e67a423d47b2af8))
+* **api:** add oauth-provider plugin with generated schema and append-only migration ([c68a29f](https://github.com/andersro93/flare-idp/commit/c68a29f0c22fd70de318f03b20aeaf944a13848c))
+* **api:** admin oauth client management with policy and audit ([a227e4c](https://github.com/andersro93/flare-idp/commit/a227e4cb4a00c629b5437e3b49860512efd9684c))
+* **api:** document oidc protocol endpoints and add oidc smoke script ([a7095d3](https://github.com/andersro93/flare-idp/commit/a7095d36e38c6c11d0db0b14382b4f3c0f430259))
+* **api:** expose oidc protocol endpoints behind method-aware allowlist with root discovery ([6560122](https://github.com/andersro93/flare-idp/commit/6560122c5a6909359b70564a6d40db1a4e465223))
+* **api:** first-run setup endpoint with atomic claim and admin provisioning ([6e6b36f](https://github.com/andersro93/flare-idp/commit/6e6b36f8524bd8d24ee5e1c3ee41cb75f0e90c00))
+* **api:** http core — env validation, security middleware, D1 rate limiter, error envelope ([108b2f7](https://github.com/andersro93/flare-idp/commit/108b2f77be93695f891a7804f238a2483da6f41b))
+* **api:** machine scopes and clientCredentialsScopes for the client_credentials grant ([48bcd17](https://github.com/andersro93/flare-idp/commit/48bcd17e13873ef5c1a9fee6387c559b300be6de))
+* **api:** oauth consent facade proxying real requests to the provider ([5d59eb2](https://github.com/andersro93/flare-idp/commit/5d59eb211b38f06bb9d539310bc98261a9efb17c))
+* **api:** password reset/change and email verification endpoints ([a4323fc](https://github.com/andersro93/flare-idp/commit/a4323fc47e970c9a26bd9ee79d84c144baea30da))
+* **api:** production auth core, openapi app skeleton, email queue and housekeeping ([5840ea8](https://github.com/andersro93/flare-idp/commit/5840ea8932b37dc20a42320eeacbbf61f53237a0))
+* **api:** session endpoints (sign-in, sign-out, current session) ([f50b543](https://github.com/andersro93/flare-idp/commit/f50b5438e3ec04a620c7d979cc7538571d1d95f0))
+* **db:** drizzle schema with generated better-auth tables and drizzle-kit migrations ([b9e5c5b](https://github.com/andersro93/flare-idp/commit/b9e5c5b9d425a6947aec61b9801880b9b5ed7fb6))
+* **email:** email job types, templates and queue/cloudflare senders ([a851d24](https://github.com/andersro93/flare-idp/commit/a851d2423f0b420de15a8abeb79549befae3e66d))
+* **shared:** error codes, roles and request/response schemas ([e3a9e4a](https://github.com/andersro93/flare-idp/commit/e3a9e4a44e186fa33a5806ac1e662ee24cb75837))
+
+
+### Bug Fixes
+
+* **api:** apply safe error logging to the email queue consumer ([bbef66f](https://github.com/andersro93/flare-idp/commit/bbef66fb55b8b233a89c51e055aa71d308f5374a))
+* **api:** apply standalone application_type patches to oauth clients ([f1fbbfc](https://github.com/andersro93/flare-idp/commit/f1fbbfcbdcbc304da886550e379898edce2b339f))
+* **api:** drop better-auth cookie cache so session reads always honor revocation ([89e3269](https://github.com/andersro93/flare-idp/commit/89e3269e1f98e19b725d4c874e6f54c396d295df))
+* **api:** invalidate cached setup session so the first admin's role is live immediately ([d8a9113](https://github.com/andersro93/flare-idp/commit/d8a9113bea4b0e1012fead919544b9babf0f3dfe))
+* **api:** keep 422/409 auth errors in the 4xx envelope ([509ffd0](https://github.com/andersro93/flare-idp/commit/509ffd0ab265104d8850d5858cd2f19a83800ea6))
+* **api:** never log raw messages from unhandled errors ([4b9723a](https://github.com/andersro93/flare-idp/commit/4b9723a40e3470e93df7cb576f0788ee716ae421))
+* **api:** send only provided fields when updating oauth clients ([1bf3ad9](https://github.com/andersro93/flare-idp/commit/1bf3ad98db30c1edc5340d52be69c90bced8afb6))
+* **api:** serve scalar docs bootstrap as external script to satisfy CSP ([7baac34](https://github.com/andersro93/flare-idp/commit/7baac340e9b59696e81b2b70fdfb8941346653ba))
+* **api:** stop leaking 500s as 400 and close phase-1 review gaps ([3047b92](https://github.com/andersro93/flare-idp/commit/3047b9275f8eafea4ffa35f6d48e76990a82a87f))
+
+
+### Documentation
+
+* add phase 1 implementation plan (auth core, drizzle schema, facade skeleton) ([373b768](https://github.com/andersro93/flare-idp/commit/373b768e33334cd675ac20736d22146b2f5c3698))
+* add phase 2 implementation plan (oauth 2.1 / oidc provider) ([bb3f1b5](https://github.com/andersro93/flare-idp/commit/bb3f1b56b975a158d24adc43e22bd04ccc5ce4ab))
+* phase 2 measurements and roadmap ([f92a874](https://github.com/andersro93/flare-idp/commit/f92a87417e1bfd1d12b9620ad5667c0cfb159167))
+* refresh readme status blurb for phase 2 ([03c0a60](https://github.com/andersro93/flare-idp/commit/03c0a6077cee9d07e72686e38202e24bfb336d5b))
+
 ## 0.1.0 (2026-08-21)
 
 ### Features
