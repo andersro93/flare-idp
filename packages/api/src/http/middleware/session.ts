@@ -35,13 +35,18 @@ function toSessionUser(user: RawSession["user"]): SessionUser {
  *
  * `disableCookieCache: true` — this is the authoritative session check every
  * `/api/*` request relies on for authz (`requireAuth`/`requireAdmin`) and for
- * `GET /api/session`; Better-Auth's cookie cache would otherwise answer
- * straight from a signed client-side blob for up to `cookieCache.maxAge`
- * seconds, so a revoked session (sign-out-all, admin ban, password reset)
- * would still read as valid until that blob expired. The KV secondary
- * storage (`kvSecondaryStorage`) is the intended read cache instead (Global
- * Constraints: "KV = session read cache only") — it's consulted by
- * Better-Auth's internal adapter and stays correctly invalidated on revoke.
+ * `GET /api/session`. The `auth` singleton's `session` config has no
+ * `cookieCache` block (see `auth/auth.ts`), so this flag is currently
+ * belt-and-suspenders: it's kept as defense-in-depth so a FUTURE change that
+ * re-enables `cookieCache` on the config can't silently reintroduce a
+ * ≤`maxAge`-second stale-revocation window here — Better-Auth's cookie cache,
+ * when enabled, answers straight from a signed client-side blob without
+ * touching the DB or KV at all, so a revoked session (sign-out-all, admin
+ * ban, password reset) would read as valid until that blob expired. The KV
+ * secondary storage (`kvSecondaryStorage`) is the intended read cache
+ * instead (Global Constraints: "KV = session read cache only") — it's
+ * consulted by Better-Auth's internal adapter and stays correctly
+ * invalidated on revoke.
  */
 export function loadSession(
   authRef: () => SessionFetcher,

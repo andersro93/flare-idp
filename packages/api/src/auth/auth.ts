@@ -32,7 +32,9 @@ export function createAuth(
       storeSessionInDatabase: true,
       expiresIn: 60 * 60 * 24 * 14,
       updateAge: 60 * 60 * 24,
-      cookieCache: { enabled: true, maxAge: 300 },
+      // No cookieCache: session reads must always hit KV/D1 so revocation
+      // takes effect on the next request (KV is the read cache). See
+      // loadSession's disableCookieCache.
     },
     verification: { storeInDatabase: true },
     emailAndPassword: {

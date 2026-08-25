@@ -79,6 +79,10 @@ describe("POST /api/session/sign-in/password", () => {
     const body = (await res.json()) as { user: { email: string } };
     expect(body.user.email).toBe(SETUP_ADMIN.email);
     expect(jar.names()).toContain("better-auth.session_token");
+    // No cookieCache configured (auth/auth.ts) — the cookie-cache blob must
+    // never be set, since a stale copy of it would defeat immediate
+    // revocation.
+    expect(jar.names()).not.toContain("better-auth.session_data");
 
     const sessionRes = await api("/api/session", {}, jar);
     const sessionBody = (await sessionRes.json()) as {
