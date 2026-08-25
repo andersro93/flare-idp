@@ -52,3 +52,15 @@ export async function completeInstallation(
     })
     .where(eq(appInstallation.id, 1));
 }
+
+/**
+ * Rolls a claimed install lock back to `pending`. Used when provisioning the
+ * admin account fails after `claimInstallation` succeeded, so a later
+ * request can retry setup from a clean state.
+ */
+export async function releaseInstallation(db: AppDatabase): Promise<void> {
+  await db
+    .update(appInstallation)
+    .set({ status: "pending", ownerUserId: null, ownerEmail: null })
+    .where(eq(appInstallation.id, 1));
+}
