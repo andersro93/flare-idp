@@ -70,6 +70,18 @@ describe("email rendering", () => {
         expect(result.text).toContain("did not request");
         expect(result.html).toContain("did not request");
       });
+
+      it("escapes appName in html", () => {
+        const job: EmailJob = {
+          kind: "reset-password",
+          to: "user@example.com",
+          recipientName: "John",
+          url: "https://example.com/reset?token=abc",
+        };
+        const result = renderEmail(job, "<b>Evil</b> App");
+        expect(result.html).toContain("&lt;b&gt;Evil&lt;/b&gt; App");
+        expect(result.html).not.toContain("<b>Evil</b>");
+      });
     });
 
     describe("verify-email", () => {

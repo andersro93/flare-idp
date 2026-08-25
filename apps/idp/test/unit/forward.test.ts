@@ -26,9 +26,27 @@ describe("mapAuthError", () => {
     );
   });
 
-  it("defaults unmapped statuses to invalid_request", () => {
+  it("maps INTERNAL_SERVER_ERROR to a generic 500 without leaking the upstream message", () => {
+    expect(
+      mapAuthError(
+        new APIError("INTERNAL_SERVER_ERROR", { message: "db exploded" }),
+      ),
+    ).toEqual(
+      expect.objectContaining({
+        code: "internal",
+        status: 500,
+        message: "Internal error",
+      }),
+    );
+  });
+
+  it("defaults unmapped statuses to a generic 500 without leaking the upstream message", () => {
     expect(mapAuthError(new APIError("CONFLICT", { message: "dup" }))).toEqual(
-      expect.objectContaining({ code: "invalid_request", status: 400 }),
+      expect.objectContaining({
+        code: "internal",
+        status: 500,
+        message: "Internal error",
+      }),
     );
   });
 

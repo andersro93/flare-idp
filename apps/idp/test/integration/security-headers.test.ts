@@ -5,6 +5,7 @@ import { describe, expect, it } from "vitest";
 function expectStrictHeaders(res: Response) {
   const csp = res.headers.get("content-security-policy");
   expect(csp).toContain("frame-ancestors 'none'");
+  expect(csp).toContain("form-action 'self'");
   expect(csp).not.toContain("unsafe-inline");
   expect(res.headers.get("strict-transport-security")).toContain("max-age=");
   expect(res.headers.get("x-content-type-options")).toBe("nosniff");

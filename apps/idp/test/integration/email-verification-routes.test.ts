@@ -133,4 +133,19 @@ describe("POST /api/auth/email/resend", () => {
     expect(res.status).toBe(200);
     expect(await res.json()).toEqual({ ok: true });
   });
+
+  it("rate limits after 3 requests in the window, per user (4th -> 429)", async () => {
+    await completeSetup();
+    const { jar } = await signIn(SETUP_ADMIN.email, SETUP_ADMIN.password);
+
+    for (let i = 0; i < 3; i += 1) {
+      const res = await api("/api/auth/email/resend", { method: "POST" }, jar);
+      expect(res.status).toBe(200);
+    }
+
+    const fourth = await api("/api/auth/email/resend", { method: "POST" }, jar);
+    expect(fourth.status).toBe(429);
+    const body = errorBodySchema.parse(await fourth.json());
+    expect(body.error.code).toBe("rate_limited");
+  });
 });

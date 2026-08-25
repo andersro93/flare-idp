@@ -86,6 +86,8 @@ describe("RATE_LIMITS", () => {
       passwordForgot: { name: "pw-forgot", windowSeconds: 300, max: 3 },
       passwordReset: { name: "pw-reset", windowSeconds: 300, max: 5 },
       emailVerify: { name: "email-verify", windowSeconds: 300, max: 10 },
+      passwordChange: { name: "pw-change", windowSeconds: 300, max: 5 },
+      emailResend: { name: "email-resend", windowSeconds: 600, max: 3 },
     });
   });
 });

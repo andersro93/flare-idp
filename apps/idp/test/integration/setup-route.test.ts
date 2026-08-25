@@ -187,11 +187,13 @@ describe("POST /api/setup/complete", () => {
       method: "POST",
       body: completeBody(),
     });
-    // `signUpEmail`'s duplicate-email APIError maps through `mapAuthError`
-    // to 400 `invalid_request` (BAD_REQUEST -> invalid_request).
-    expect(res.status).toBe(400);
+    // `signUpEmail`'s duplicate-email error is Better-Auth's
+    // `UNPROCESSABLE_ENTITY` — not one of `mapAuthError`'s explicitly
+    // whitelisted 4xx statuses, so it falls to the safe `default` branch:
+    // a generic 500 `internal`, never masquerading as a 400.
+    expect(res.status).toBe(500);
     const body = errorBodySchema.parse(await res.json());
-    expect(body.error.code).toBe("invalid_request");
+    expect(body.error.code).toBe("internal");
 
     const statusRow = await env.DB.prepare(
       "SELECT status FROM app_installation WHERE id = 1",

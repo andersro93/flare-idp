@@ -28,8 +28,20 @@ beforeEach(async () => {
 
 describe("audit repository", () => {
   it("records and lists audit events, newest first", async () => {
-    await recordAuditEvent(db, { event: "test.one", actorIp: "127.0.0.1" });
-    await recordAuditEvent(db, { event: "test.two", actorUserId: "u1" });
+    // recordAuditEvent always stamps `at: Date.now()` internally — two calls
+    // in the same millisecond would make ordering depend on the random UUID
+    // tiebreaker instead of insertion order. Insert directly with explicit,
+    // distinct `at` values so this test is deterministic.
+    await env.DB.prepare(
+      "INSERT INTO audit_events (id, at, event, actor_ip) VALUES (?1, ?2, ?3, ?4)",
+    )
+      .bind(crypto.randomUUID(), 1000, "test.one", "127.0.0.1")
+      .run();
+    await env.DB.prepare(
+      "INSERT INTO audit_events (id, at, event, actor_user_id) VALUES (?1, ?2, ?3, ?4)",
+    )
+      .bind(crypto.randomUUID(), 2000, "test.two", "u1")
+      .run();
 
     const { items } = await listAuditEvents(db, { limit: 10 });
     expect(items.map((e) => e.event)).toEqual(["test.two", "test.one"]);

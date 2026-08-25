@@ -261,6 +261,41 @@ describe("POST /api/auth/password/change", () => {
     expect(body.error.code).toBe("invalid_credentials");
   });
 
+  it("rate limits after 5 attempts in the window, per user (6th -> 429)", async () => {
+    await completeSetup();
+    const { jar } = await signIn(SETUP_ADMIN.email, SETUP_ADMIN.password);
+
+    for (let i = 0; i < 5; i += 1) {
+      const res = await api(
+        "/api/auth/password/change",
+        {
+          method: "POST",
+          body: JSON.stringify({
+            currentPassword: "totally-wrong-password",
+            newPassword: "brand-new-correct-horse",
+          }),
+        },
+        jar,
+      );
+      expect(res.status).toBe(400);
+    }
+
+    const sixth = await api(
+      "/api/auth/password/change",
+      {
+        method: "POST",
+        body: JSON.stringify({
+          currentPassword: "totally-wrong-password",
+          newPassword: "brand-new-correct-horse",
+        }),
+      },
+      jar,
+    );
+    expect(sixth.status).toBe(429);
+    const body = errorBodySchema.parse(await sixth.json());
+    expect(body.error.code).toBe("rate_limited");
+  });
+
   it("revokes other sessions by default", async () => {
     await completeSetup();
     const { jar: jar1 } = await signIn(SETUP_ADMIN.email, SETUP_ADMIN.password);

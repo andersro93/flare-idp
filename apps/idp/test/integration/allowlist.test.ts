@@ -33,6 +33,7 @@ describe("Better-Auth allowlist", () => {
     ["PUT", "/api/auth/jwks"],
     ["DELETE", "/api/auth/jwks"],
     ["PATCH", "/api/auth/jwks"],
+    ["POST", "/api/auth/jwks"],
     ["PUT", "/api/auth/sign-in/email"],
   ])(
     "%s %s (not allowlisted) returns the 404 envelope",
