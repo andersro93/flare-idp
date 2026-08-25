@@ -275,6 +275,23 @@ describe("client_credentials grant", () => {
     const uiBody = (await uiRes.json()) as RfcError;
     expect(uiBody.error).toBe("invalid_scope");
   });
+
+  it("refuses the grant for a confidential client with no clientCredentialsScopes assigned (400 unauthorized_client)", async () => {
+    const jar = await setupAdmin();
+    // Grant configured, but NO machine-scope assignment: the plugin refuses
+    // outright ("client has no authorized client_credentials scopes").
+    const { clientId, clientSecret } = await createOAuthClient(jar, {
+      grantTypes: ["authorization_code", "client_credentials"],
+    });
+
+    const res = await tokenRequest(
+      { grant_type: "client_credentials" },
+      { clientId, clientSecret },
+    );
+    expect(res.status).toBe(400);
+    const body = (await res.json()) as RfcError;
+    expect(body.error).toBe("unauthorized_client");
+  });
 });
 
 describe("introspection and revocation", () => {

@@ -52,6 +52,27 @@ describe("OIDC discovery", () => {
     "/.well-known/openid-configuration",
     "/.well-known/oauth-authorization-server",
   ])(
+    "%s advertises only user-delegated scopes (machine scopes stay unpublished)",
+    async (path) => {
+      const res = await SELF.fetch(`http://localhost${path}`);
+      expect(res.status).toBe(200);
+      const body = (await res.json()) as { scopes_supported?: string[] };
+      // `advertisedMetadata.scopes_supported` pins the public docs to the
+      // user-delegated set; the internal M2M "api" scope is issuable via
+      // client_credentials but deliberately not advertised.
+      expect(body.scopes_supported).toEqual([
+        "openid",
+        "profile",
+        "email",
+        "offline_access",
+      ]);
+    },
+  );
+
+  it.each([
+    "/.well-known/openid-configuration",
+    "/.well-known/oauth-authorization-server",
+  ])(
     "POST %s (GET-only root rewrite) falls to Hono's default 404, not our envelope or the discovery doc",
     async (path) => {
       const res = await SELF.fetch(`http://localhost${path}`, {

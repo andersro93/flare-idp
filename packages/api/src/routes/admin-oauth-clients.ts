@@ -352,20 +352,26 @@ const deleteRoute = createRoute({
 
 // NOTE on the `auth.api.getOAuthClient(s)` / `adminUpdateOAuthClient` /
 // `rotateClientSecret` / `deleteOAuthClient` calls below: `clientPrivileges`
-// is intentionally unset (see auth.ts), but that does NOT make these calls
-// privilege-free for any admin — the plugin still resolves the calling
-// session and enforces ROW OWNERSHIP (`client.userId === session.user.id`),
-// independent of `requireAdmin` above. `adminCreateOAuthClient` stamps the
-// new row's `userId` with the creating admin's own session user id, so
-// every client any one admin creates stays fully manageable through this
-// facade by that SAME admin — fine today, since exactly one admin exists.
-// If a second admin account ever lands (Phase 6), a client created by admin
-// A will 401 (ownership mismatch, not a 403) when admin B tries to
-// get/patch/rotate/delete it here. The fix then is the plugin's
-// `clientReference` mechanism (map every client to a shared reference id
-// instead of a per-user `userId`, e.g. "the org" or "the admin group") so
-// clients become globally admin-managed — NOT `clientPrivileges`, which
-// only gates the action itself and does not bypass the ownership check.
+// is now SET (admin-only, see auth.ts — required for
+// `client_credentials_scopes` assignment), but these calls are still not
+// privilege-free for any admin — the plugin resolves the calling session and
+// enforces ROW OWNERSHIP (`client.userId === session.user.id`), independent
+// of `requireAdmin` above. `adminCreateOAuthClient` stamps the new row's
+// `userId` with the creating admin's own session user id, so every client
+// any one admin creates stays fully manageable through this facade by that
+// SAME admin — fine today, since exactly one admin exists. If a second admin
+// account ever lands (Phase 6), a client created by admin A will 401
+// (ownership mismatch, not a 403) when admin B tries to
+// get/patch/rotate/delete it here — with ONE now-ACTIVE carve-out: setting
+// `clientPrivileges` enabled the plugin's `isCrossOwnerScopeConfiguration`
+// path in `updateClientEndpoint`, so an admin CAN patch
+// `clientCredentialsScopes` ALONE (no other fields in the update) on a
+// client owned by a different admin. Zero live impact with a single admin;
+// tracked with the Phase 6 `clientReference` work (map every client to a
+// shared reference id instead of a per-user `userId`, e.g. "the org" or
+// "the admin group") so clients become globally admin-managed —
+// `clientPrivileges` alone gates actions but does not lift the ownership
+// check for anything beyond that single carve-out.
 
 // `.openapi()` calls MUST be chained directly off `newRouter()`'s result and
 // the return captured (see account.ts for the full explanation of why); the

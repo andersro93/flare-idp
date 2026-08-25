@@ -94,14 +94,19 @@ export function createAuth(
         // not user-delegated, so MACHINE_SCOPES must be registered here even
         // though the consent facade never shows them.
         scopes: [...OAUTH_SCOPES, ...MACHINE_SCOPES],
+        // Machine scopes are an internal M2M concern — keep them out of the
+        // public discovery doc's `scopes_supported` (the plugin validates at
+        // init that every advertised scope is in `scopes` above).
+        advertisedMetadata: { scopes_supported: [...OAUTH_SCOPES] },
         storeClientSecret: "hashed",
         // Facade-only client CRUD still holds (endpoints off the allowlist),
         // but `client_credentials_scopes` assignment is additionally gated by
         // the plugin behind `clientPrivileges` even for server-side
         // `auth.api.admin*` calls (`assertClientPrivileges` throws
         // UNAUTHORIZED for "configure-client-credentials-scopes" when the
-        // option is unset) — grant it to admins. This does NOT bypass the
-        // row-ownership check on client reads/updates (verified in Task 3).
+        // option is unset) — grant it to admins. NOTE: setting this ALSO
+        // activates the plugin's cross-owner carve-out on client update (see
+        // the ownership note in routes/admin-oauth-clients.ts).
         clientPrivileges: ({ user }) =>
           ((user as { role?: string } | undefined)?.role ?? "user") === "admin",
         customIdTokenClaims: ({ user }) => ({

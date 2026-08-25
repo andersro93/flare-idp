@@ -25,6 +25,9 @@ export const auth = betterAuth({
       loginPage: "/sign-in",
       consentPage: "/oauth/consent",
       scopes: ["openid", "profile", "email", "offline_access", "api"],
+      advertisedMetadata: {
+        scopes_supported: ["openid", "profile", "email", "offline_access"],
+      },
       storeClientSecret: "hashed",
       clientPrivileges: ({ user }) =>
         ((user as { role?: string } | undefined)?.role ?? "user") === "admin",
