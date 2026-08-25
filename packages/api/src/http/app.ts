@@ -3,6 +3,7 @@ import {
   oauthProviderAuthServerMetadata,
   oauthProviderOpenIdConfigMetadata,
 } from "@better-auth/oauth-provider";
+import type { MiddlewareHandler } from "hono";
 import { cors } from "hono/cors";
 import { secureHeaders } from "hono/secure-headers";
 import { createAuth } from "../auth/auth";
@@ -102,21 +103,17 @@ export const CSRF_EXEMPT_PATHS = [
   "/api/auth/oauth2/introspect",
   "/api/auth/oauth2/revoke",
 ] as const;
-app.use("/api/*", (c, next) =>
+// Typed explicitly as `MiddlewareHandler<{ Bindings: Env }>` — matching
+// `rejectCrossSiteMutations`'s own narrower type — rather than inlined:
+// `.use()`'s second type parameter infers from the handler it's given, so
+// an explicitly-typed top-level middleware is accepted without a cast,
+// where a bare arrow function inferred against `AppEnv` at the call site
+// would not be.
+const csrfGate: MiddlewareHandler<{ Bindings: Env }> = (c, next) =>
   (CSRF_EXEMPT_PATHS as readonly string[]).includes(c.req.path)
     ? next()
-    : // `rejectCrossSiteMutations` is intentionally typed `MiddlewareHandler<{
-      // Bindings: Env }>` (no `Variables`), decoupled from `AppEnv` — Hono's
-      // `Context#set` is a strictly-checked arrow-typed property, so a
-      // `Context<AppEnv>` (superset `Variables`) isn't structurally
-      // assignable to `Context<{ Bindings: Env }>` even though it satisfies
-      // it at runtime. `.use()` itself special-cases this via an overload;
-      // a direct call like this one does not, hence the cast.
-      rejectCrossSiteMutations(
-        c as unknown as Parameters<typeof rejectCrossSiteMutations>[0],
-        next,
-      ),
-);
+    : rejectCrossSiteMutations(c, next);
+app.use("/api/*", csrfGate);
 
 // A misconfigured environment must never reach `loadSession` (which would
 // otherwise try to build a broken Better-Auth call chain per request) or any
@@ -156,7 +153,11 @@ export type AppType = typeof routes;
 // Better-Auth's own HTTP handler is mounted for an ALLOWLIST of exact
 // (path, methods) pairs only — everything else under /api/auth/* falls
 // through to the /api/* 404 envelope below. Growing this list is a
-// conscious diff (see allowlist.test.ts).
+// conscious diff (see allowlist.test.ts). NOTE: the two `.well-known`
+// entries below are NOT dispatched to `auth.handler` like the rest — they
+// are SERVER_ONLY endpoints (see `openIdConfigHandler`/
+// `authServerConfigHandler` below) and are special-cased inside the mount
+// to call those metadata adapters instead.
 export const BETTER_AUTH_ALLOWLIST = [
   { path: "/api/auth/jwks", methods: ["GET"] },
   { path: "/api/auth/oauth2/authorize", methods: ["GET", "POST"] },
