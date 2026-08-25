@@ -24,8 +24,10 @@ export const auth = betterAuth({
     oauthProvider({
       loginPage: "/sign-in",
       consentPage: "/oauth/consent",
-      scopes: ["openid", "profile", "email", "offline_access"],
+      scopes: ["openid", "profile", "email", "offline_access", "api"],
       storeClientSecret: "hashed",
+      clientPrivileges: ({ user }) =>
+        ((user as { role?: string } | undefined)?.role ?? "user") === "admin",
       customIdTokenClaims: ({ user }) => ({
         role: (user as { role?: string }).role ?? "user",
       }),

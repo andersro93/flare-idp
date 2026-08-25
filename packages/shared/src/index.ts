@@ -7,12 +7,13 @@ export { ERROR_CODES, errorBodySchema } from "./errors";
 export type { Role } from "./roles";
 export { ROLES } from "./roles";
 
-export type { OAuthScope } from "./schemas";
+export type { MachineScope, OAuthScope } from "./schemas";
 export {
   consentInfoSchema,
   consentPostSchema,
   emailSchema,
   emailVerifySchema,
+  MACHINE_SCOPES,
   nameSchema,
   OAUTH_SCOPES,
   oauthClientCreateSchema,

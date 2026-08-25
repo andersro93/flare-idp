@@ -5,7 +5,7 @@ import { drizzleAdapter } from "@better-auth/drizzle-adapter";
 import { oauthProvider } from "@better-auth/oauth-provider";
 import { dbFor, schema } from "@flare-idp/db";
 import { type EmailSender, queueEmailSender } from "@flare-idp/email";
-import { OAUTH_SCOPES } from "@flare-idp/shared";
+import { MACHINE_SCOPES, OAUTH_SCOPES } from "@flare-idp/shared";
 import { betterAuth } from "better-auth/minimal";
 import { admin, jwt } from "better-auth/plugins";
 import { kvSecondaryStorage } from "../kv-secondary-storage";
@@ -84,14 +84,26 @@ export function createAuth(
         jwt: { issuer: env.APP_URL },
         jwks: { keyPairConfig: { alg: "EdDSA", crv: "Ed25519" } },
       }),
-      // Client CRUD happens only through our requireAdmin facade
-      // (clientPrivileges intentionally unset); the plugin's own client
-      // endpoints stay OFF the allowlist.
+      // Client CRUD happens only through our requireAdmin facade; the
+      // plugin's own client endpoints stay OFF the allowlist.
       oauthProvider({
         loginPage: "/sign-in",
         consentPage: "/oauth/consent",
-        scopes: [...OAUTH_SCOPES],
+        // User-delegated scopes + machine scopes: the plugin only issues
+        // client_credentials tokens for scopes that are BOTH in this list and
+        // not user-delegated, so MACHINE_SCOPES must be registered here even
+        // though the consent facade never shows them.
+        scopes: [...OAUTH_SCOPES, ...MACHINE_SCOPES],
         storeClientSecret: "hashed",
+        // Facade-only client CRUD still holds (endpoints off the allowlist),
+        // but `client_credentials_scopes` assignment is additionally gated by
+        // the plugin behind `clientPrivileges` even for server-side
+        // `auth.api.admin*` calls (`assertClientPrivileges` throws
+        // UNAUTHORIZED for "configure-client-credentials-scopes" when the
+        // option is unset) — grant it to admins. This does NOT bypass the
+        // row-ownership check on client reads/updates (verified in Task 3).
+        clientPrivileges: ({ user }) =>
+          ((user as { role?: string } | undefined)?.role ?? "user") === "admin",
         customIdTokenClaims: ({ user }) => ({
           role: (user as { role?: string }).role ?? "user",
         }),

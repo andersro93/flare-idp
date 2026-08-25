@@ -228,6 +228,43 @@ describe("POST /api/admin/oauth-clients", () => {
     const body = errorBodySchema.parse(await res.json());
     expect(body.error.code).toBe("invalid_request");
   });
+
+  it("creates a client_credentials client with machine scopes echoed in the DTO", async () => {
+    const adminJar = await setupAdmin();
+
+    const res = await createClient(adminJar, {
+      grantTypes: ["authorization_code", "client_credentials"],
+      clientCredentialsScopes: ["api"],
+    });
+    expect(res.status).toBe(201);
+    const body = (await res.json()) as CreateResponseBody & {
+      client: { clientCredentialsScopes?: string[] };
+    };
+    expect(body.client.clientCredentialsScopes).toEqual(["api"]);
+  });
+
+  it("rejects a user-delegated scope in clientCredentialsScopes (400 invalid_request)", async () => {
+    const adminJar = await setupAdmin();
+
+    const res = await createClient(adminJar, {
+      grantTypes: ["authorization_code", "client_credentials"],
+      clientCredentialsScopes: ["openid"],
+    });
+    expect(res.status).toBe(400);
+    const body = errorBodySchema.parse(await res.json());
+    expect(body.error.code).toBe("invalid_request");
+  });
+
+  it("rejects clientCredentialsScopes without the client_credentials grant (400 invalid_request)", async () => {
+    const adminJar = await setupAdmin();
+
+    const res = await createClient(adminJar, {
+      clientCredentialsScopes: ["api"],
+    });
+    expect(res.status).toBe(400);
+    const body = errorBodySchema.parse(await res.json());
+    expect(body.error.code).toBe("invalid_request");
+  });
 });
 
 describe("GET /api/admin/oauth-clients/:clientId", () => {

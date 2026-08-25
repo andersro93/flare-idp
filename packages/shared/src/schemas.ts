@@ -15,6 +15,16 @@ export const SCOPE_DESCRIPTIONS: Record<OAuthScope, string> = {
   offline_access: "Stay signed in (refresh tokens)",
 };
 
+// Machine (M2M) scopes, assignable per-client as `clientCredentialsScopes`
+// for the client_credentials grant. Kept SEPARATE from OAUTH_SCOPES: the
+// oauth-provider plugin refuses user-delegated scopes (all four above) as
+// client_credentials scopes, and a client_credentials token has no user to
+// consent, so these never appear on the consent screen. They ARE part of the
+// provider's `scopes` option (packages/api/src/auth/auth.ts), which is what
+// makes them issuable at all.
+export const MACHINE_SCOPES = ["api"] as const;
+export type MachineScope = (typeof MACHINE_SCOPES)[number];
+
 export const emailSchema = z.string().trim().toLowerCase().pipe(z.email());
 
 export const passwordSchema = z.string().min(12).max(128);
@@ -93,6 +103,11 @@ export const oauthClientCreateSchema = z.object({
   scope: z.array(z.string().trim().min(1)).min(1),
   skipConsent: z.boolean().default(false),
   applicationType: z.enum(["web", "native"]).optional(),
+  // Machine scopes the client may request via the client_credentials grant
+  // (must be ⊆ MACHINE_SCOPES — facade policy). Without at least one, the
+  // plugin refuses client_credentials token requests outright
+  // ("client has no authorized client_credentials scopes").
+  clientCredentialsScopes: z.array(z.string().trim().min(1)).optional(),
 });
 
 // `tokenEndpointAuthMethod` is deliberately NOT patchable: Better-Auth's
@@ -109,6 +124,7 @@ export const oauthClientPatchSchema = z
     scope: z.array(z.string().trim().min(1)).min(1).optional(),
     skipConsent: z.boolean().optional(),
     applicationType: z.enum(["web", "native"]).optional(),
+    clientCredentialsScopes: z.array(z.string().trim().min(1)).optional(),
   })
   .refine((v) => Object.keys(v).length > 0, "empty patch");
 
@@ -149,4 +165,8 @@ export const oauthClientDtoSchema = z.object({
   applicationType: z.enum(["web", "native"]).nullable().optional(),
   disabled: z.boolean().optional(),
   createdAt: z.coerce.date().optional(),
+  // Only present on create/patch responses: Better-Auth's ADMIN client calls
+  // return `client_credentials_scopes`, but the plain `getOAuthClient(s)`
+  // reads the facade uses for GET/list do not carry the field.
+  clientCredentialsScopes: z.array(z.string()).optional(),
 });

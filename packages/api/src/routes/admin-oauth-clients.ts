@@ -1,6 +1,7 @@
 import { dbFor, recordAuditEvent } from "@flare-idp/db";
 import {
   errorBodySchema,
+  MACHINE_SCOPES,
   OAUTH_SCOPES,
   oauthClientCreateSchema,
   oauthClientDtoSchema,
@@ -72,6 +73,7 @@ type ClientPolicyInput = {
   grantTypes?: string[];
   tokenEndpointAuthMethod?: string;
   applicationType?: "web" | "native";
+  clientCredentialsScopes?: string[];
 };
 
 /**
@@ -152,6 +154,44 @@ function applyClientPolicy(
     );
   }
 
+  if (
+    input.clientCredentialsScopes !== undefined &&
+    input.clientCredentialsScopes.length > 0
+  ) {
+    // Machine scopes ONLY: Better-Auth refuses user-delegated scopes
+    // (openid/profile/email/offline_access) as client_credentials scopes,
+    // and anything outside the provider's configured scope list.
+    const unknown = input.clientCredentialsScopes.filter(
+      (s) => !(MACHINE_SCOPES as readonly string[]).includes(s),
+    );
+    if (unknown.length > 0) {
+      throw new AppError(
+        400,
+        "invalid_request",
+        `client_credentials_scopes: not a machine scope: ${unknown.join(", ")} (allowed: ${MACHINE_SCOPES.join(", ")})`,
+      );
+    }
+    // Cross-field checks fire only when the other field is present in the
+    // same call (same rationale as the grant/auth-method check above).
+    if (
+      input.grantTypes !== undefined &&
+      !input.grantTypes.includes("client_credentials")
+    ) {
+      throw new AppError(
+        400,
+        "invalid_request",
+        "client_credentials_scopes requires the client_credentials grant",
+      );
+    }
+    if (input.tokenEndpointAuthMethod === "none") {
+      throw new AppError(
+        400,
+        "invalid_request",
+        "client_credentials_scopes requires a confidential client (token_endpoint_auth_method other than none)",
+      );
+    }
+  }
+
   return forceNative ? "native" : input.applicationType;
 }
 
@@ -170,7 +210,13 @@ function applyClientPolicy(
 
 type OAuthClientRow = Awaited<ReturnType<typeof auth.api.getOAuthClient>>;
 
-function toDto(client: OAuthClientRow) {
+// The ADMIN create/update responses additionally carry
+// `client_credentials_scopes`; the plain reads used for GET/list do not.
+type MaybeAdminClientRow = OAuthClientRow & {
+  client_credentials_scopes?: string[];
+};
+
+function toDto(client: MaybeAdminClientRow) {
   return {
     clientId: client.client_id,
     name: client.client_name,
@@ -185,6 +231,7 @@ function toDto(client: OAuthClientRow) {
       client.client_id_issued_at !== undefined
         ? new Date(client.client_id_issued_at * 1000)
         : undefined,
+    clientCredentialsScopes: client.client_credentials_scopes,
   };
 }
 
@@ -345,6 +392,7 @@ export const adminOauthClientRoutes = adminOauthClientRoutesBase
       grantTypes: body.grantTypes,
       tokenEndpointAuthMethod: body.tokenEndpointAuthMethod,
       applicationType: body.applicationType,
+      clientCredentialsScopes: body.clientCredentialsScopes,
     });
 
     const created = await callAuth(c, () =>
@@ -358,6 +406,7 @@ export const adminOauthClientRoutes = adminOauthClientRoutesBase
           scope: body.scope.join(" "),
           skip_consent: body.skipConsent,
           application_type: applicationType,
+          client_credentials_scopes: body.clientCredentialsScopes,
         },
         headers: c.req.raw.headers,
         returnHeaders: true,
@@ -409,6 +458,7 @@ export const adminOauthClientRoutes = adminOauthClientRoutesBase
       scope: body.scope,
       grantTypes: body.grantTypes,
       applicationType: body.applicationType,
+      clientCredentialsScopes: body.clientCredentialsScopes,
     });
 
     // Build `update` with ONLY the keys the caller actually provided.
@@ -437,6 +487,11 @@ export const adminOauthClientRoutes = adminOauthClientRoutesBase
     if (body.skipConsent !== undefined) update.skip_consent = body.skipConsent;
     if (applicationType !== undefined) {
       update.application_type = applicationType;
+    }
+    // Better-Auth auto-clears these to [] whenever the merged client loses
+    // the client_credentials grant or becomes public.
+    if (body.clientCredentialsScopes !== undefined) {
+      update.client_credentials_scopes = body.clientCredentialsScopes;
     }
 
     const updated = await callAuth(c, () =>
