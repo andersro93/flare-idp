@@ -77,3 +77,53 @@ export const sessionInfoSchema = z.object({
   ipAddress: z.string().nullable().optional(),
   current: z.boolean(),
 });
+
+// Fields are intentionally loose strings/arrays here (not enums) — the
+// admin OAuth-client facade (packages/api/src/routes/admin-oauth-clients.ts)
+// enforces the actual policy (allowed scopes/grant types/auth methods,
+// redirect URI shape) itself, BEFORE calling Better-Auth, so it can return a
+// specific `invalid_request` message. Restricting these to zod enums here
+// would just produce a generic zod validation message instead and skip that
+// policy code entirely.
+export const oauthClientCreateSchema = z.object({
+  name: z.string().trim().min(1).max(200),
+  redirectUris: z.array(z.string().trim().min(1)),
+  tokenEndpointAuthMethod: z.string().trim().min(1),
+  grantTypes: z.array(z.string().trim().min(1)).min(1),
+  scope: z.array(z.string().trim().min(1)).min(1),
+  skipConsent: z.boolean().default(false),
+  applicationType: z.enum(["web", "native"]).optional(),
+});
+
+// `tokenEndpointAuthMethod` is deliberately NOT patchable: Better-Auth's
+// `adminUpdateOAuthClient` `update` body schema has no such field (verified
+// against the installed d.mts) — changing it has side effects (clearing
+// `client_secret`, requiring `jwks`/`jwks_uri` for `private_key_jwt`) that
+// the admin update endpoint doesn't handle, so it's simply not part of that
+// contract. Rotate/recreate the client to change it.
+export const oauthClientPatchSchema = z
+  .object({
+    name: z.string().trim().min(1).max(200).optional(),
+    redirectUris: z.array(z.string().trim().min(1)).optional(),
+    grantTypes: z.array(z.string().trim().min(1)).min(1).optional(),
+    scope: z.array(z.string().trim().min(1)).min(1).optional(),
+    skipConsent: z.boolean().optional(),
+    applicationType: z.enum(["web", "native"]).optional(),
+  })
+  .refine((v) => Object.keys(v).length > 0, "empty patch");
+
+// camelCase DTO — never carries `clientSecret` (that's added only by the
+// create/rotate response wrappers in the route file, where the plaintext
+// secret is genuinely present).
+export const oauthClientDtoSchema = z.object({
+  clientId: z.string(),
+  name: z.string().optional(),
+  redirectUris: z.array(z.string()),
+  tokenEndpointAuthMethod: z.string().optional(),
+  grantTypes: z.array(z.string()).optional(),
+  scope: z.string().optional(),
+  skipConsent: z.boolean().optional(),
+  applicationType: z.enum(["web", "native"]).nullable().optional(),
+  disabled: z.boolean().optional(),
+  createdAt: z.coerce.date().optional(),
+});

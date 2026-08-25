@@ -8,6 +8,7 @@ import { cors } from "hono/cors";
 import { secureHeaders } from "hono/secure-headers";
 import { createAuth } from "../auth/auth";
 import { accountRoutes } from "../routes/account";
+import { adminOauthClientRoutes } from "../routes/admin-oauth-clients";
 import { emailVerificationRoutes } from "../routes/email-verification";
 import { healthRoutes } from "../routes/health";
 import { passwordRoutes } from "../routes/password";
@@ -147,7 +148,8 @@ const routes = app
   .route("/api/session", sessionRoutes)
   .route("/api/auth/password", passwordRoutes)
   .route("/api/auth/email", emailVerificationRoutes)
-  .route("/api/account", accountRoutes);
+  .route("/api/account", accountRoutes)
+  .route("/api/admin/oauth-clients", adminOauthClientRoutes);
 export type AppType = typeof routes;
 
 // Better-Auth's own HTTP handler is mounted for an ALLOWLIST of exact
