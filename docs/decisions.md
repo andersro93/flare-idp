@@ -379,3 +379,107 @@ wrong silently drops the token rather than erroring.
 - **From the first production deploy, D1 migrations are append-only.** The Phase 1 renumbering trick (deleting `0001` and regenerating `0000_init`) is no longer available; every schema change is a new drizzle-kit migration applied on top.
 - `wrangler types` runs with `--strict-vars=false`: with per-env vars, strict mode emits literal-union types for `ENVIRONMENT`/`APP_URL` that break comparisons against test-injected values.
 - Email sending stays inert until the ros-nett.com sending domain is onboarded to Cloudflare Email Service (dashboard step); email jobs retry into the DLQ meanwhile. `OUTBOUND_EMAIL_FROM=noreply@ros-nett.com` in production vars.
+
+## Phase 2 addendum (2026-08-25)
+
+Facts recorded at Phase 2 close-out (Task 7), against the same tool versions plus
+`@better-auth/oauth-provider` 1.7.1. Behavioral facts below are pinned by
+`apps/idp/test/integration/{allowlist,discovery,admin-oauth-clients,oauth-consent,oidc-flow,openapi}.test.ts`
+unless noted.
+
+**(a) `BETTER_AUTH_ALLOWLIST` as shipped** (`packages/api/src/http/app.ts`): 8 method-aware
+`{ path, methods }` entries — `jwks` (GET), `oauth2/authorize` (GET+POST), `oauth2/token` (POST),
+`oauth2/userinfo` (GET+POST), `oauth2/introspect` (POST), `oauth2/revoke` (POST), and the two
+`.well-known` docs (GET). The two `.well-known` entries do NOT dispatch to `auth.handler`: the
+plugin registers `getOpenIdConfig`/`getOAuthServerConfig` with `metadata: { SERVER_ONLY: true }`
+and better-call's router skips SERVER_ONLY endpoints outright, so they are served via the
+package-exported `oauthProviderOpenIdConfigMetadata`/`oauthProviderAuthServerMetadata` adapters.
+Root `GET /.well-known/{openid-configuration,oauth-authorization-server}` call the same adapters;
+`GET /.well-known/jwks.json` still rewrites to `/api/auth/jwks` through `auth.handler`. Deliberately
+OUT: `end-session`, dynamic client registration (`/oauth2/register`), the plugin's own client-CRUD
+endpoints (all client management goes through the requireAdmin facade), DPoP, pairwise subjects.
+
+**(b) CSRF exemptions** (`CSRF_EXEMPT_PATHS`, `app.ts`): exactly `oauth2/token`,
+`oauth2/introspect`, `oauth2/revoke` skip the origin guard (server-to-server RP calls carry no
+Origin header). `authorize` stays origin-checked for POST; GET is untouched by the guard.
+
+**(c) Token-endpoint rate limit**: `RATE_LIMITS.oauthToken` (30/min per IP), enforced inline in the
+allowlist mount BEFORE `auth.handler`. The 429 uses the RFC 6749 shape —
+`{"error":"temporarily_unavailable","error_description":...}` with `Retry-After` — NOT the facade
+envelope, because RP libraries parse top-level `error`.
+
+**(d) Real shapes discovered wiring the plugin** (Task 1/3): `storeClientSecret: "hashed"` is a
+valid option value; the `customIdTokenClaims`/`customUserInfoClaims` callbacks receive
+`{ user, scopes, ... }`; the schema regen produced 7 new tables (incl. `oauth_client_assertion`,
+`oauth_resource` — unused so far); the gen config needed a `baseURL` for plugin init.
+`adminUpdateOAuthClient`'s update body has NO `token_endpoint_auth_method` (auth method is not
+patchable — rotate/recreate instead), and its spread-merge treats explicitly-`undefined` keys as
+writes (wipes stored values) — the facade builds a conditional update object
+(`packages/api/src/routes/admin-oauth-clients.ts`).
+
+**(e) client_credentials mechanics** (Task 5): the grant is doubly un-issuable out of the box —
+the plugin hardcodes a USER_DELEGATED_SCOPES exclusion (user scopes can never be granted to
+machines) AND `assertClientPrivileges` hard-throws when the `clientPrivileges` option is unset,
+even for server-side admin calls. Shipped: `clientPrivileges` configured admin-only,
+`MACHINE_SCOPES = ["api"]` (`@flare-idp/shared`), `clientCredentialsScopes` passthrough on the
+admin facade. A client without configured machine scopes gets `400 unauthorized_client`;
+machine-token userinfo → `400 invalid_scope`. `advertisedMetadata.scopes_supported` is pinned to
+`OAUTH_SCOPES` so `"api"` never appears in discovery (asserted in `discovery.test.ts`).
+
+**(f) Consent proxy mechanics** (`packages/api/src/routes/oauth-consent.ts`): the consent POST
+must be a REAL `Request` through `auth.handler` carrying the verbatim `oauth_query`
+(`auth.api.oauth2Consent` cannot be called server-side — confirmed S4 finding). `oauth_query` is a
+signed bearer artifact (HMAC + expiry, not session-bound, replayable within its window) — plugin-
+inherent; the CSRF guard covers the cross-site variant. `accept: application/json` on the proxied
+request forces the `{ redirect: true, url }` JSON response instead of a 302.
+
+**(g) Refresh semantics**: rotation on every refresh grant; reusing a rotated-out refresh token →
+`400 invalid_grant` and invalidates the token family. A refresh token is only issued when
+`offline_access` was in the authorize scope.
+
+**(h) PKCE enforcement point**: a public client (`token_endpoint_auth_method: "none"`) omitting
+`code_challenge` fails at AUTHORIZE — `302` to the redirect_uri with `error=invalid_request` —
+not at the token endpoint.
+
+**(i) Authorize has dual response shapes**: browser navigations get a real `302`; fetch-style
+requests get `200 { redirect: true, url }`. The heuristic keys on more than the `accept` header —
+bun's `fetch` with `accept: text/html` still received the JSON variant (observed by the smoke
+script, which accepts both), while workerd-test requests with the same headers get the 302.
+Success redirects carry the RFC 9207 `iss` parameter.
+
+**(j) Client ownership model, current status**: the plugin enforces row-ownership on client
+management even for admins (`clientPrivileges` does NOT bypass it — verified), with ONE active
+carve-out: `isCrossOwnerScopeConfiguration` lets an admin cross-owner PATCH
+`clientCredentialsScopes` alone. Fine while there is a single admin; global admin-managed clients
+need `clientReference` — deferred to Phase 6 (tracked in `admin-oauth-clients.ts` comments).
+
+**(k) Log discipline for arbitrary errors** (Task 6 fix rounds): never log an arbitrary error's
+`message` — drizzle-orm's `DrizzleQueryError` message is the failed SQL plus every bound parameter
+(plaintext verification/reset tokens included), and `console.*` reaches Workers Logs in
+production. `errorTypeOf(err)` (`packages/api/src/http/log.ts`) is the canonical descriptor
+(constructor name; `Error#name` is the useless generic `"Error"` for Drizzle's subclass), used by
+`handleApiError`'s `unhandled_error` and the queue consumer's `email_job_send_failed`.
+`password.ts`'s `password_forgot_failed` keeps `error.message` by explicit ruling — it is
+`APIError`-gated (Better-Auth's controlled strings; anything else rethrows to the safe handler).
+
+**(l) Protocol endpoints in OpenAPI**: hand-written path items
+(`packages/api/src/openapi/protocol-routes.ts`) registered via
+`app.openAPIRegistry.registerPath(...)` — verified that `@hono/zod-openapi` 1.6.1's registry
+accepts raw OpenAPI `SchemaObject`s alongside zod, and `doc31` reads the registry at request time,
+so no doc-handler wrapping was needed. Documentation only; not part of `AppType`.
+
+**(m) Phase 2 startup re-measure** (`bun run --cwd apps/idp check:startup`, 2026-08-25):
+
+| Metric               | Phase 0 baseline | Phase 1         | Phase 2         | Budget                        | Status |
+| -------------------- | ----------------:| ---------------:| ---------------:| ----------------------------- | ------ |
+| Bundle, raw          | 2,630,348 bytes  | 1,678,418 bytes | 2,094,803 bytes | —                             | —      |
+| Bundle, gzip         | 551,408 bytes    | 356,779 bytes   | 450,777 bytes   | < 3 MB (3,145,728 bytes)      | PASS   |
+| Startup CPU (active) | 85.0 ms          | 95.0 ms         | 138.9 ms        | target < 200 ms, limit 400 ms | PASS   |
+
+Phase 2 re-added `@better-auth/oauth-provider` (removed in Phase 1) plus the facade/consent/admin
+routes: gzip +94 KB (+26%) and startup CPU +43.9 ms (95.0 → 138.9, incl. 6.6 ms GC) over Phase 1.
+Both PASS, but the CPU number now sits at ~70% of the 200 ms target (local-machine measurement,
+not Cloudflare's CPUs — directional only). Not alarming, no mitigation taken; Phase 5 (passkey
+plugin returns) should re-measure and consider lazy-loading if the trend continues. Note:
+`wrangler check startup` evaluates the module graph with no vars, so Better-Auth prints a
+harmless "Base URL is not set" warning during analysis — not a production condition.

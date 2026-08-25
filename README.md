@@ -130,8 +130,8 @@ Secrets (`AUTH_SECRET`, `SETUP_SECRET`, social-provider keys) are set with `wran
 |---|---|---|
 | 0 | Monorepo scaffold, CI, Workers test harness, risk spikes (OIDC on D1, passkeys on `workerd`, KV, Email Service, Queues, cold start) | ✅ done |
 | 1 | Drizzle schema, production Better Auth config, Hono skeleton, session + setup API, rate limiting | ✅ done |
-| 2 | OAuth 2.1 / OIDC provider: discovery, JWKS, authorization code + PKCE, consent, client credentials, admin client API | 🔜 next |
-| 3 | Web UI (sign-in, consent, account), deploy workflows — **first relying app logs in** | ⏳ |
+| 2 | OAuth 2.1 / OIDC provider: discovery, JWKS, authorization code + PKCE, consent, client credentials, admin client API | ✅ done |
+| 3 | Web UI (sign-in, consent, account), deploy workflows — **first relying app logs in** | 🔜 next |
 | 4 | Organizations, teams, roles and token claims | ⏳ |
 | 5 | TOTP 2FA, passkeys, social login, account linking | ⏳ |
 | 6 | Admin console, settings, audit log, stats | ⏳ |
